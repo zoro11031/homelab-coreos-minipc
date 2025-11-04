@@ -1,0 +1,7 @@
+- type: systemd
+  system:
+    enabled:
+      - wg-quick@wg0.service
+      - mnt-nas-media.mount
+      - mnt-nas-nextcloud.mount
+      - mnt-nas-immich.mount

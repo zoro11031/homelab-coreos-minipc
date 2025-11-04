@@ -1,0 +1,13 @@
+- type: rpm-ostree
+  install:
+    - https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-%OS_VERSION%.noarch.rpm
+    - https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-%OS_VERSION%.noarch.rpm
+
+- type: rpm-ostree
+  install:
+    # Intel VAAPI hardware acceleration packages
+    - intel-media-driver      # iHD driver for Intel Gen 8+ (Broadwell and newer)
+    - libva                   # VAAPI core library
+    - libva-utils             # vainfo and debugging tools
+    - ffmpeg                  # Hardware-accelerated encoding/decoding
+    - gstreamer1-vaapi        # GStreamer VAAPI plugin
