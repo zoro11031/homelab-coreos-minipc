@@ -111,7 +111,7 @@ It pulls media from the file server over NFS and exposes services to the interne
 - **Jellyfin** — direct port `8096` (and optional `8920` for HTTPS).  
 - **Overseerr** — media request management, accessed via VPS hostname.  
 - **Wizarr** — automated Plex/Jellyfin invite handling.  
-- **Nextcloud AIO** — personal cloud and groupware.  
+- **Nextcloud** — personal cloud and groupware with PostgreSQL, Redis, and Collabora.  
 - **Immich** — photo and video backup platform.
 
 All of these are defined in a compose file such as `compose/minipc.yml` in this repo.

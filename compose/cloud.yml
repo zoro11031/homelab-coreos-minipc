@@ -1,31 +1,119 @@
 version: '3.9'
 
-# Cloud Services - Nextcloud AIO and Immich
+# Cloud Services - Nextcloud and Immich
 # These services store data on NFS mounts and are accessed via VPS reverse proxy
 
 services:
-  # Nextcloud All-in-One
-  nextcloud-aio-mastercontainer:
-    image: nextcloud/all-in-one:latest
-    container_name: nextcloud-aio-mastercontainer
+  # Nextcloud - Personal cloud and groupware
+  nextcloud:
+    image: docker.io/library/nextcloud:apache
+    container_name: nextcloud
     restart: unless-stopped
-    ports:
-      - "8080:8080"
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
     environment:
-      - APACHE_PORT=11000
-      - APACHE_IP_BINDING=0.0.0.0
-      - SKIP_DOMAIN_VALIDATION=false
-      - NEXTCLOUD_DATADIR=/mnt/nas-nextcloud/data
-      - NEXTCLOUD_MOUNT=/mnt/nas-nextcloud
+      # Database configuration
+      - POSTGRES_HOST=nextcloud-db
+      - POSTGRES_DB=${NEXTCLOUD_DB_DATABASE:-nextcloud}
+      - POSTGRES_USER=${NEXTCLOUD_DB_USERNAME:-nc_user}
+      - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+
+      # Redis configuration
+      - REDIS_HOST=nextcloud-redis
+
+      # Trusted domains and URL overrides
+      - NEXTCLOUD_TRUSTED_DOMAINS=${NEXTCLOUD_TRUSTED_DOMAINS:-cloud.example.com}
+      - OVERWRITEPROTOCOL=https
+      - OVERWRITEHOST=${NEXTCLOUD_OVERWRITE_HOST:-cloud.example.com}
+      - OVERWRITECLIURL=https://${NEXTCLOUD_OVERWRITE_HOST:-cloud.example.com}
+
+      # PHP configuration
+      - PHP_MEMORY_LIMIT=${NEXTCLOUD_PHP_MEMORY_LIMIT:-1024M}
+      - PHP_UPLOAD_LIMIT=${NEXTCLOUD_PHP_UPLOAD_LIMIT:-1024M}
+
+      # User and timezone
+      - TZ=${TZ:-America/New_York}
     volumes:
-      - nextcloud_aio_mastercontainer:/mnt/docker-aio-config
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Bind mount for Nextcloud data
-      - /mnt/nas-nextcloud:/mnt/nas-nextcloud:rw
+      - /mnt/nas-nextcloud/nextcloud/html:/var/www/html:z
+      - /mnt/nas-nextcloud/data:/var/www/html/data:z
+      - /mnt/nas-nextcloud/nextcloud/custom_apps:/var/www/html/custom_apps:z
+      - /mnt/nas-nextcloud/nextcloud/config:/var/www/html/config:z
+      - /mnt/nas-nextcloud/nextcloud/themes:/var/www/html/themes:z
+    ports:
+      - "8080:80"
     networks:
       - cloud
     labels:
-      - "com.centurylinklabs.watchtower.enable=false"  # AIO manages its own updates
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Nextcloud background jobs (cron)
+  nextcloud-cron:
+    image: docker.io/library/nextcloud:apache
+    container_name: nextcloud-cron
+    restart: unless-stopped
+    depends_on:
+      - nextcloud-db
+      - nextcloud-redis
+    entrypoint: /cron.sh
+    environment:
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - /mnt/nas-nextcloud/nextcloud/html:/var/www/html:z
+      - /mnt/nas-nextcloud/data:/var/www/html/data:z
+      - /mnt/nas-nextcloud/nextcloud/custom_apps:/var/www/html/custom_apps:z
+      - /mnt/nas-nextcloud/nextcloud/config:/var/www/html/config:z
+      - /mnt/nas-nextcloud/nextcloud/themes:/var/www/html/themes:z
+    networks:
+      - cloud
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # PostgreSQL database for Nextcloud
+  nextcloud-db:
+    image: docker.io/library/postgres:16-alpine
+    container_name: nextcloud-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${NEXTCLOUD_DB_DATABASE:-nextcloud}
+      - POSTGRES_USER=${NEXTCLOUD_DB_USERNAME:-nc_user}
+      - POSTGRES_PASSWORD=${NEXTCLOUD_DB_PASSWORD}
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - ${APPDATA_PATH}/nextcloud/db:/var/lib/postgresql/data:Z
+    networks:
+      - cloud
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Redis cache for Nextcloud
+  nextcloud-redis:
+    image: docker.io/library/redis:7-alpine
+    container_name: nextcloud-redis
+    restart: unless-stopped
+    command: ["redis-server", "--save", "60", "1", "--loglevel", "warning"]
+    networks:
+      - cloud
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  # Collabora Online - Office document editing (optional)
+  collabora:
+    image: docker.io/collabora/code:latest
+    container_name: collabora
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-America/New_York}
+      - username=${COLLABORA_USERNAME:-admin}
+      - password=${COLLABORA_PASSWORD}
+      - domain=${COLLABORA_DOMAIN:-cloud\\.example\\.com}
+      - extra_params=--o:ssl.enable=false --o:ssl.termination=true
+    ports:
+      - "9980:9980"
+    networks:
+      - cloud
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
 
   # Immich - Self-hosted photo and video backup
   immich-server:
@@ -114,10 +202,6 @@ services:
       - ${APPDATA_PATH}/immich/postgres:/var/lib/postgresql/data
     networks:
       - cloud
-
-volumes:
-  nextcloud_aio_mastercontainer:
-    name: nextcloud_aio_mastercontainer
 
 networks:
   cloud:
