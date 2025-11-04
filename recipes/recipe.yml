@@ -1,64 +1,31 @@
 ---
 # yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
-# NAB9 Mini PC - Frontend Application Node
-# Builds on uCore (Ublue CoreOS) for immutable infrastructure
-
 name: homelab-coreos-minipc
-description: Frontend application node for homelab - handles Jellyfin, Plex, Overseerr, Nextcloud, and Immich with hardware transcoding
+description: Frontend application node for NAB9 mini PC
 
-# Base on uCore for immutable container-focused OS
 base-image: ghcr.io/ublue-os/ucore
-image-version: stable # Use stable for production, or 'latest' for newest features
+image-version: latest
 
-# Module configuration - executed in order
 modules:
-  # Install required system packages
   - type: dnf
     install:
       packages:
-        # Network utilities
-        - wireguard-tools      # VPN for VPS tunnel
-        - nfs-utils            # NFS client for file server mounts
-        - tcpdump              # Network debugging
-        - iperf3               # Network performance testing
+        - wireguard-tools
+        - nfs-utils
+        - intel-media-driver
+        - libva-utils
 
-        # Container runtime and orchestration
-        - docker-ce            # Docker for running containers
-        - docker-ce-cli
-        - docker-compose-plugin
-
-        # Hardware support
-        - intel-media-driver   # Intel QuickSync support
-        - libva-utils          # VA-API verification tools
-        - mesa-dri-drivers     # GPU drivers
-
-        # System management
-        - htop                 # System monitoring
-        - iotop                # I/O monitoring
-        - tmux                 # Terminal multiplexer
-        - vim                  # Text editor
-
-        # Security
-        - ufw                  # Firewall management
-        - fail2ban             # Intrusion prevention
-
-  # Copy system configuration files
   - type: files
     files:
       - source: system
         destination: /
 
-  # Enable required systemd services
   - type: systemd
     system:
       enabled:
-        - docker.service
         - wg-quick@wg0.service
         - mnt-nas-media.mount
         - mnt-nas-nextcloud.mount
         - mnt-nas-immich.mount
-        - ufw.service
-        - fail2ban.service
 
-  # Set up proper signing for verified images
   - type: signing
