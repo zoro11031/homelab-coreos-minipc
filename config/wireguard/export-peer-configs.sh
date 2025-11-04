@@ -136,7 +136,7 @@ for peer in "${PEER_ORDER[@]}"; do
         echo "AllowedIPs=$ALLOWED_IPS"
         echo "PersistentKeepalive=30"
     } > "$output_file"
-
+    echo "Generated config for ${PEER_LABELS[$peer]}: $output_file" >&2
 done
 
 echo "Generated client configs in $OUTPUT_DIR:" >&2
