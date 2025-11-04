@@ -3,8 +3,9 @@
 name: homelab-coreos-minipc
 description: Frontend application node for NAB9 mini PC
 
+# the base image to build on top of (FROM) and the version tag to use
 base-image: ghcr.io/ublue-os/ucore
-image-version: latest
+image-version: stable
 
 modules:
   # Enable RPM Fusion repos for intel-media-driver and ffmpeg
