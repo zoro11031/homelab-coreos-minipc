@@ -27,18 +27,66 @@ It pulls media from the file server over NFS and exposes services to the interne
 
 ---
 
-## Architecture
+## Network Architecture
 
-    Internet
-       ├─→ Plex (32400) — direct WAN to NAB9
-       ├─→ Jellyfin (8096/8920) — direct WAN to NAB9
-       └─→ WireGuard Tunnel → VPS (NPM)
-                ↓
-          Overseerr / Wizarr / Nextcloud / Immich
-                ↓
-          NFS over LAN (192.168.7.x)
-                ↓
-          File Server (uCore)
+```
+                         Internet
+                            │
+        ┌───────────────────┴─────────────────────┐
+        │                                         │
+        ↓                                         ↓
+┌────────────────────────┐          Direct Ports 8096/8920 & 32400
+│   DigitalOcean VPS     │          (NAB9 Mini PC only)
+│  ┌──────────────────┐  │                     │
+│  │ Nginx Proxy      │  │                     │
+│  │ Manager          │  │                     │
+│  │ (SSL/reverse     │  │                     │
+│  │  proxy)          │  │                     │
+│  │ Routes:          │  │                     │
+│  │ • Overseerr      │  │                     │
+│  │ • Wizarr         │  │                     │
+│  │ • Nextcloud      │  │                     │
+│  │ • Immich         │  │                     │
+│  └──────────────────┘                      │
+             |                                 |
+             |                                 │                                  
+  WireGuard Tunnel (encrypted)                 │
+             │                                 │
+             ↓                                 │
+   ┌────────────────────────────────────────────┴─────────────┐
+   │                NAB9 Mini PC (Ublue CoreOS)               │
+   │                (Frontend / User-Facing)                  │
+   │  ┌────────────────────────────────────────────────────┐  │
+   │  │                                                    │  │
+   │  │ • Docker Stack                                     │  │
+   │  │ • Jellyfin (direct exposure)                       │  │
+   │  │ • Plex (direct exposure)                           │  │
+   │  │ • Overseerr / Wizarr / Nextcloud / Immich (via     │  │
+   │  │   VPS)                                             │  │
+   │  └────────────────────────────────────────────────────┘  │
+   └───────────────┬──────────────────────────────────────────┘
+                   │
+             (Direct LAN Connection)
+                   │
+                   ↓
+      ┌─────────────────────────────────────────┐
+      │      File Server (Ublue CoreOS)         │
+      │      (Backend / Storage & Automation)   │
+      │  ┌───────────────────────────────────┐  │
+      │  │ • SnapRAID + mergerfs             │  │
+      │  │ • NFS Server (192.168.7.x)        │  │
+      │  │ • Sonarr / Radarr / Lidarr        │  │
+      │  │ • Prowlarr                        │  │
+      │  │ • qBittorrent + VPN (outbound)    │  │
+      │  │ • Outbound downloads via pfSense  │  │
+      │  │ • No inbound exposure (LAN only)  │  │
+      │  └───────────────────────────────────┘  │
+      └─────────────────────────────────────────┘
+                   │
+                   ↓
+              DAS Storage
+        (18-19 data disks + parity)
+```
 
 ---
 
