@@ -102,11 +102,19 @@ Example structure (conceptual):
 
 ### WireGuard
 
-- VPS endpoint: `64.23.212.68:51820`  
-- Local peer (NAB9): `10.99.0.2/24`  
-- VPS peer: `10.99.0.1/24`  
+The mini PC acts as a WireGuard server with the following configuration:
 
-Config lives in `/etc/wireguard/wg0.conf` via BlueBuild and autostarts with `wg-quick@wg0.service`.
+- **Server**: `10.253.0.1/24` (NAB9 mini PC)
+- **Listen Port**: `51820`
+- **Network**: `10.253.0.0/24`
+
+**Configured Peers**:
+- LAN-Desktop-Justin: `10.253.0.6/32`
+- VPS: `10.253.0.8/32`
+- iPhone: `10.253.0.9/32`
+- Framework Laptop Justin: `10.253.0.11/32`
+
+Config template is in `config/wireguard/wg0.conf.template`. Use the setup scripts to generate keys and deploy to `/etc/wireguard/wg0.conf`. The service autostarts with `wg-quick@wg0.service`.
 
 ### NFS Mounts
 
@@ -191,15 +199,58 @@ On boot:
 
 ## Setup
 
-1. Configure WireGuard: `cp config/wireguard/wg0.conf.template config/wireguard/wg0.conf`
-2. Configure compose: `cp compose/.env.example compose/.env`
-3. Update NFS mount IPs in `files/system/etc/systemd/system/*.mount`
-4. Deploy: `cd compose && docker compose -f media.yml -f web.yml -f cloud.yml up -d`
+### 1. Configure WireGuard
+
+Generate WireGuard keys and configuration:
+
+```bash
+cd config/wireguard
+./generate-keys.sh    # Generate all keys and create .env
+./apply-config.sh     # Generate wg0.conf from template
+./export-peer-configs.sh --endpoint your.public.host:51820 \
+    --allowed-ips 10.253.0.0/24 --dns 1.1.1.1
+```
+
+The `generate-keys.sh` script will:
+- Generate server private/public keys
+- Generate keys for all 4 peers (Desktop, VPS, iPhone, Laptop)
+- Create a `.env` file with all keys
+- Store individual key files in `keys/` directory
+
+The `apply-config.sh` script will:
+- Read keys from `.env`
+- Generate `wg0.conf` from the template
+- Output client configuration details
+
+The `export-peer-configs.sh` script will:
+- Read keys from the `keys/` directory
+- Generate import-ready client configs in `peer-configs/`
+- Validate that all required key files exist before writing anything
+
+**Important**: Update the network interface in `wg0.conf.template` if your system doesn't use `eth0`. Common alternatives: `enp1s0`, `eno1`, etc.
+
+### 2. Configure Docker Compose
+
+```bash
+cp compose/.env.example compose/.env
+# Edit compose/.env with your service-specific configuration
+```
+
+### 3. Update NFS Mounts
+
+Update NFS mount IPs in `files/system/etc/systemd/system/*.mount` to match your file server.
+
+### 4. Deploy Services
+
+```bash
+cd compose
+docker compose -f media.yml -f web.yml -f cloud.yml up -d
+```
 
 ## Network
 
 - Direct access: Plex (32400), Jellyfin (8096/8920)
-- VPS tunnel: Everything else via WireGuard (10.99.0.0/24)
+- WireGuard VPN: Server on 10.253.0.0/24 for remote access and VPS tunnel
 - NFS: Media from 192.168.7.10
 
 ## Base Image

@@ -1,38 +1,38 @@
-# WireGuard VPN Configuration for NAB9 Mini PC
-# This connects the mini PC to the DigitalOcean VPS for secure tunneling
-# IMPORTANT: Replace placeholders with actual values before deployment
+# Local server configuration
 
 [Interface]
-# NAB9 Mini PC configuration
-Address = 10.99.0.2/24
-PrivateKey = YOUR_PRIVATE_KEY_HERE
-ListenPort = 51820
+PrivateKey=[SERVER_PRIVATE_KEY]
+Address=10.253.0.1/24
+ListenPort=51820
 
-# DNS through the tunnel (optional - use VPS or local DNS)
-# DNS = 1.1.1.1, 1.0.0.1
-
-# Routing table (optional - for policy-based routing)
-# Table = auto
-
-# MTU optimization for better performance
-MTU = 1420
-
-# PostUp/PreDown scripts for firewall rules
-PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-PreDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+# Enable IP forwarding and NAT for WireGuard clients
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o [OUTBOUND_INTERFACE] -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o [OUTBOUND_INTERFACE] -j MASQUERADE
 
 [Peer]
-# DigitalOcean VPS endpoint
-PublicKey = VPS_PUBLIC_KEY_HERE
-PresharedKey = PRESHARED_KEY_HERE
+#LAN-Desktop-Justin
+PublicKey=[DESKTOP_PUBLIC_KEY]
+PresharedKey=[DESKTOP_PRESHARED_KEY]
+AllowedIPs=10.253.0.6/32
+PersistentKeepalive=30
 
-# VPS endpoint address and port
-Endpoint = YOUR_VPS_IP:51820
+[Peer]
+#VPS
+PublicKey=[VPS_PUBLIC_KEY]
+PresharedKey=[VPS_PRESHARED_KEY]
+AllowedIPs=10.253.0.8/32
+PersistentKeepalive=30
 
-# Allowed IPs - what traffic goes through the tunnel
-# For full tunnel: AllowedIPs = 0.0.0.0/0, ::/0
-# For split tunnel (recommended): AllowedIPs = 10.99.0.0/24
-AllowedIPs = 10.99.0.0/24
+[Peer]
+#iPhone
+PublicKey=[IPHONE_PUBLIC_KEY]
+PresharedKey=[IPHONE_PRESHARED_KEY]
+AllowedIPs=10.253.0.9/32
+PersistentKeepalive=30
 
-# Keep connection alive (important for NAT traversal)
-PersistentKeepalive = 25
+[Peer]
+#Framework Laptop Justin
+PublicKey=[LAPTOP_PUBLIC_KEY]
+PresharedKey=[LAPTOP_PRESHARED_KEY]
+AllowedIPs=10.253.0.11/32
+PersistentKeepalive=30
