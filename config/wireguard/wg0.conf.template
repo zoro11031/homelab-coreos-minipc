@@ -1,20 +1,14 @@
 # Local server configuration
 
 [Interface]
-#Remote Tunnel
 PrivateKey=[PRIVATE KEY]
 Address=10.253.0.1/24
 ListenPort=51820
-PostUp=logger -t wireguard 'Tunnel WireGuard-wg0 started';/usr/local/emhttp/webGui/scripts/update_services
-PostUp=iptables -t nat -A POSTROUTING -s 10.253.0.0/24 -o br0 -j MASQUERADE;iptables -t nat -A POSTROUTING -s 10.253.0.0/24 -o vhost0 -j MASQUERADE
-PostDown=logger -t wireguard 'Tunnel WireGuard-wg0 stopped';/usr/local/emhttp/webGui/scripts/update_services
-PostDown=iptables -t nat -D POSTROUTING -s 10.253.0.0/24 -o br0 -j MASQUERADE;iptables -t nat -D POSTROUTING -s 10.253.0.0/24 -o vhost0 -j MASQUERADE
-PostUp=ip -4 route flush table 200
-PostUp=ip -4 route add default via 10.253.0.1 dev wg0 table 200
-PostUp=ip -4 route add 192.168.7.0/24 via 192.168.7.1 dev br0 table 200
-PostDown=ip -4 route flush table 200
-PostDown=ip -4 route add unreachable default table 200
-PostDown=ip -4 route add 192.168.7.0/24 via 192.168.7.1 dev br0 table 200
+
+# Enable IP forwarding and NAT for WireGuard clients
+# Replace 'eth0' with your primary network interface (e.g., enp1s0, eno1)
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
 
 [Peer]
 #LAN-Desktop-Justin
