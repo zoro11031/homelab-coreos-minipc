@@ -58,13 +58,7 @@ done
 
 echo "Generating wg0.conf from template..."
 
-# Create wg0.conf from template
-sed -e "s|\[PRIVATE KEY\]|$WG_SERVER_PRIVATE_KEY|g" \
-    -e "s|\[PUBLIC KEY\]|$WG_PEER_DESKTOP_PUBLIC_KEY|g" \
-    -e "s|\[PRE SHARED KEY\]|$WG_PEER_DESKTOP_PRESHARED_KEY|g" \
-    "$TEMPLATE_FILE" > "$OUTPUT_FILE.tmp"
-
-# Replace peer keys in order (using a more complex approach for multiple peers)
+# Generate wg0.conf from template with all keys replaced
 cat "$TEMPLATE_FILE" | \
     sed "s|\[PRIVATE KEY\]|$WG_SERVER_PRIVATE_KEY|g" | \
     awk -v desktop_pub="$WG_PEER_DESKTOP_PUBLIC_KEY" \
@@ -119,8 +113,6 @@ cat "$TEMPLATE_FILE" | \
         }
         print line
     }' > "$OUTPUT_FILE"
-
-rm -f "$OUTPUT_FILE.tmp"
 
 chmod 600 "$OUTPUT_FILE"
 
