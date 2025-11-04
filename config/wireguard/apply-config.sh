@@ -2,7 +2,7 @@
 # WireGuard Configuration Script
 # This script applies the keys from .env to the wg0.conf template
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
@@ -50,7 +50,7 @@ REQUIRED_VARS=(
 )
 
 for var in "${REQUIRED_VARS[@]}"; do
-    if [ -z "${!var}" ]; then
+    if [ -z "${!var:-}" ]; then
         echo -e "${RED}Error: $var is not set in .env${NC}"
         exit 1
     fi
@@ -58,61 +58,42 @@ done
 
 echo "Generating wg0.conf from template..."
 
-# Generate wg0.conf from template with all keys replaced
-cat "$TEMPLATE_FILE" | \
-    sed "s|\[PRIVATE KEY\]|$WG_SERVER_PRIVATE_KEY|g" | \
-    awk -v desktop_pub="$WG_PEER_DESKTOP_PUBLIC_KEY" \
-        -v desktop_psk="$WG_PEER_DESKTOP_PRESHARED_KEY" \
-        -v vps_pub="$WG_PEER_VPS_PUBLIC_KEY" \
-        -v vps_psk="$WG_PEER_VPS_PRESHARED_KEY" \
-        -v iphone_pub="$WG_PEER_IPHONE_PUBLIC_KEY" \
-        -v iphone_psk="$WG_PEER_IPHONE_PRESHARED_KEY" \
-        -v laptop_pub="$WG_PEER_LAPTOP_PUBLIC_KEY" \
-        -v laptop_psk="$WG_PEER_LAPTOP_PRESHARED_KEY" '
-    {
-        line = $0
-        if (line ~ /^PublicKey=\[PUBLIC KEY\]/ && !desktop_done) {
-            print "PublicKey=" desktop_pub
-            desktop_done = 1
-            next
-        }
-        if (line ~ /^PresharedKey=\[PRESHARED KEY\]/ && !desktop_psk_done) {
-            print "PresharedKey=" desktop_psk
-            desktop_psk_done = 1
-            next
-        }
-        if (line ~ /^PublicKey=\[PUBLIC KEY\]/ && desktop_done && !vps_done) {
-            print "PublicKey=" vps_pub
-            vps_done = 1
-            next
-        }
-        if (line ~ /^PresharedKey=\[PRESHARED KEY\]/ && !vps_psk_done) {
-            print "PresharedKey=" vps_psk
-            vps_psk_done = 1
-            next
-        }
-        if (line ~ /^PublicKey=\[PUBLIC KEY\]/ && vps_done && !iphone_done) {
-            print "PublicKey=" iphone_pub
-            iphone_done = 1
-            next
-        }
-        if (line ~ /^PresharedKey=\[PRESHARED KEY\]/ && vps_psk_done && !iphone_psk_done) {
-            print "PresharedKey=" iphone_psk
-            iphone_psk_done = 1
-            next
-        }
-        if (line ~ /^PublicKey=\[PUBLIC KEY\]/ && iphone_done && !laptop_done) {
-            print "PublicKey=" laptop_pub
-            laptop_done = 1
-            next
-        }
-        if (line ~ /^PresharedKey=\[PRESHARED KEY\]/ && iphone_psk_done && !laptop_psk_done) {
-            print "PresharedKey=" laptop_psk
-            laptop_psk_done = 1
-            next
-        }
-        print line
-    }' > "$OUTPUT_FILE"
+python3 - "$TEMPLATE_FILE" "$OUTPUT_FILE" <<'PY'
+import os
+import sys
+from pathlib import Path
+
+template_path = Path(sys.argv[1])
+output_path = Path(sys.argv[2])
+
+placeholder_map = {
+    "[SERVER_PRIVATE_KEY]": os.environ["WG_SERVER_PRIVATE_KEY"],
+    "[DESKTOP_PUBLIC_KEY]": os.environ["WG_PEER_DESKTOP_PUBLIC_KEY"],
+    "[DESKTOP_PRESHARED_KEY]": os.environ["WG_PEER_DESKTOP_PRESHARED_KEY"],
+    "[VPS_PUBLIC_KEY]": os.environ["WG_PEER_VPS_PUBLIC_KEY"],
+    "[VPS_PRESHARED_KEY]": os.environ["WG_PEER_VPS_PRESHARED_KEY"],
+    "[IPHONE_PUBLIC_KEY]": os.environ["WG_PEER_IPHONE_PUBLIC_KEY"],
+    "[IPHONE_PRESHARED_KEY]": os.environ["WG_PEER_IPHONE_PRESHARED_KEY"],
+    "[LAPTOP_PUBLIC_KEY]": os.environ["WG_PEER_LAPTOP_PUBLIC_KEY"],
+    "[LAPTOP_PRESHARED_KEY]": os.environ["WG_PEER_LAPTOP_PRESHARED_KEY"],
+}
+
+template = template_path.read_text()
+missing_placeholders = [placeholder for placeholder in placeholder_map if placeholder not in template]
+
+if missing_placeholders:
+    print(
+        "Error: Missing placeholders in template: "
+        + ", ".join(sorted(missing_placeholders)),
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
+for placeholder, value in placeholder_map.items():
+    template = template.replace(placeholder, value)
+
+output_path.write_text(template)
+PY
 
 chmod 600 "$OUTPUT_FILE"
 

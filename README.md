@@ -207,6 +207,8 @@ Generate WireGuard keys and configuration:
 cd config/wireguard
 ./generate-keys.sh    # Generate all keys and create .env
 ./apply-config.sh     # Generate wg0.conf from template
+./export-peer-configs.sh --endpoint your.public.host:51820 \
+    --allowed-ips 10.253.0.0/24 --dns 1.1.1.1
 ```
 
 The `generate-keys.sh` script will:
@@ -219,6 +221,11 @@ The `apply-config.sh` script will:
 - Read keys from `.env`
 - Generate `wg0.conf` from the template
 - Output client configuration details
+
+The `export-peer-configs.sh` script will:
+- Read keys from the `keys/` directory
+- Generate import-ready client configs in `peer-configs/`
+- Validate that all required key files exist before writing anything
 
 **Important**: Update the network interface in `wg0.conf.template` if your system doesn't use `eth0`. Common alternatives: `enp1s0`, `eno1`, etc.
 
