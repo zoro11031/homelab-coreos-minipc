@@ -80,7 +80,7 @@ done
 echo "Generating wg0.conf from template..."
 
 escape_sed_pattern() {
-    printf '%s' "$1" | sed -e 's/[.[\\*^$]/\\&/g' -e 's/]/\\&/g'
+    printf '%s' "$1" | sed -e 's/[][\\.^$*]/\\&/g'
 }
 
 escape_sed_replacement() {
