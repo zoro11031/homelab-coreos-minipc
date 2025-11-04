@@ -142,5 +142,4 @@ done
 echo "Generated client configs in $OUTPUT_DIR:" >&2
 for peer in "${PEER_ORDER[@]}"; do
     echo "  - $OUTPUT_DIR/${peer}.conf" >&2
-
 done
