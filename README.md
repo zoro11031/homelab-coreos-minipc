@@ -20,7 +20,7 @@ It pulls media from the file server over NFS and exposes services to the interne
 |-------------------------|------------------------------------------|
 | uCore (Ublue CoreOS)    | Immutable base OS on the NAB9 mini PC   |
 | Docker / Podman Compose | Orchestrates all app containers         |
-| WireGuard client        | Connects to DigitalOcean VPS            |
+| WireGuard               | Connects to DigitalOcean VPS            |
 | Nginx Proxy Manager     | SSL / reverse proxy on VPS side         |
 | Fail2ban + firewall     | Protects exposed media / SSH ports      |
 | NFS client              | Mounts media from the file server       |
