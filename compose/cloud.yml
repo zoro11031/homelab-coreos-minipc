@@ -1,0 +1,125 @@
+version: '3.9'
+
+# Cloud Services - Nextcloud AIO and Immich
+# These services store data on NFS mounts and are accessed via VPS reverse proxy
+
+services:
+  # Nextcloud All-in-One
+  nextcloud-aio-mastercontainer:
+    image: nextcloud/all-in-one:latest
+    container_name: nextcloud-aio-mastercontainer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - APACHE_PORT=11000
+      - APACHE_IP_BINDING=0.0.0.0
+      - SKIP_DOMAIN_VALIDATION=false
+      - NEXTCLOUD_DATADIR=/mnt/nas-nextcloud/data
+      - NEXTCLOUD_MOUNT=/mnt/nas-nextcloud
+    volumes:
+      - nextcloud_aio_mastercontainer:/mnt/docker-aio-config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Bind mount for Nextcloud data
+      - /mnt/nas-nextcloud:/mnt/nas-nextcloud:rw
+    networks:
+      - cloud
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"  # AIO manages its own updates
+
+  # Immich - Self-hosted photo and video backup
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: immich-server
+    restart: unless-stopped
+    command: ['start.sh', 'immich']
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/New_York}
+      - DB_HOSTNAME=immich-postgres
+      - DB_USERNAME=${IMMICH_DB_USERNAME:-postgres}
+      - DB_PASSWORD=${IMMICH_DB_PASSWORD}
+      - DB_DATABASE_NAME=${IMMICH_DB_DATABASE:-immich}
+      - REDIS_HOSTNAME=immich-redis
+      - UPLOAD_LOCATION=/mnt/nas-immich
+    volumes:
+      - /mnt/nas-immich:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "2283:3001"
+    depends_on:
+      - immich-redis
+      - immich-postgres
+    networks:
+      - cloud
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  immich-microservices:
+    image: ghcr.io/immich-app/immich-server:release
+    container_name: immich-microservices
+    restart: unless-stopped
+    command: ['start.sh', 'microservices']
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/New_York}
+      - DB_HOSTNAME=immich-postgres
+      - DB_USERNAME=${IMMICH_DB_USERNAME:-postgres}
+      - DB_PASSWORD=${IMMICH_DB_PASSWORD}
+      - DB_DATABASE_NAME=${IMMICH_DB_DATABASE:-immich}
+      - REDIS_HOSTNAME=immich-redis
+      - UPLOAD_LOCATION=/mnt/nas-immich
+    volumes:
+      - /mnt/nas-immich:/usr/src/app/upload
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      - immich-redis
+      - immich-postgres
+    networks:
+      - cloud
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    container_name: immich-machine-learning
+    restart: unless-stopped
+    environment:
+      - TZ=${TZ:-America/New_York}
+    volumes:
+      - ${APPDATA_PATH}/immich/model-cache:/cache
+    networks:
+      - cloud
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  immich-redis:
+    image: redis:7.2-alpine
+    container_name: immich-redis
+    restart: unless-stopped
+    networks:
+      - cloud
+
+  immich-postgres:
+    image: tensorchord/pgvecto-rs:pg14-v0.2.0
+    container_name: immich-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_PASSWORD=${IMMICH_DB_PASSWORD}
+      - POSTGRES_USER=${IMMICH_DB_USERNAME:-postgres}
+      - POSTGRES_DB=${IMMICH_DB_DATABASE:-immich}
+    volumes:
+      - ${APPDATA_PATH}/immich/postgres:/var/lib/postgresql/data
+    networks:
+      - cloud
+
+volumes:
+  nextcloud_aio_mastercontainer:
+    name: nextcloud_aio_mastercontainer
+
+networks:
+  cloud:
+    name: cloud
+    driver: bridge

@@ -1,0 +1,80 @@
+version: '3.9'
+
+# Media Services - Plex and Jellyfin with Intel QuickSync hardware transcoding
+# These services have direct WAN access for streaming to remote users
+
+services:
+  plex:
+    image: lscr.io/linuxserver/plex:latest
+    container_name: plex
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/New_York}
+      - VERSION=docker
+      # Hardware transcoding
+      - PLEX_CLAIM=${PLEX_CLAIM_TOKEN}
+    volumes:
+      # Plex configuration and metadata
+      - ${APPDATA_PATH}/plex:/config
+      # Media library (read-only from NFS)
+      - /mnt/nas-media:/media:ro
+      # Optional: transcode directory on fast local storage
+      - ${APPDATA_PATH}/plex/transcode:/transcode
+    devices:
+      # Intel QuickSync hardware transcoding
+      - /dev/dri:/dev/dri
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+  jellyfin:
+    image: lscr.io/linuxserver/jellyfin:latest
+    container_name: jellyfin
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/New_York}
+      # Hardware transcoding
+      - LIBVA_DRIVER_NAME=iHD
+      - JELLYFIN_PublishedServerUrl=${JELLYFIN_PUBLIC_URL}
+    ports:
+      - "8096:8096"   # HTTP
+      - "8920:8920"   # HTTPS (optional)
+      - "7359:7359/udp"  # Auto-discovery (optional)
+    volumes:
+      # Jellyfin configuration and metadata
+      - ${APPDATA_PATH}/jellyfin/config:/config
+      - ${APPDATA_PATH}/jellyfin/cache:/cache
+      # Media library (read-only from NFS)
+      - /mnt/nas-media:/media:ro
+    devices:
+      # Intel QuickSync hardware transcoding
+      - /dev/dri:/dev/dri
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+# Optional: Media management tools
+  tautulli:
+    image: lscr.io/linuxserver/tautulli:latest
+    container_name: tautulli
+    restart: unless-stopped
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-America/New_York}
+    ports:
+      - "8181:8181"
+    volumes:
+      - ${APPDATA_PATH}/tautulli:/config
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
+
+# Networks are not needed for host network mode
+# But we can define them for future services if needed
+networks:
+  media:
+    name: media
+    driver: bridge

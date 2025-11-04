@@ -1,45 +1,64 @@
 ---
 # yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
-# image will be published to ghcr.io/<user>/<name>
-name: homelab-coreos
-# description will be included in the image's metadata
-description: This is my personal OS image.
+# NAB9 Mini PC - Frontend Application Node
+# Builds on uCore (Ublue CoreOS) for immutable infrastructure
 
-# the base image to build on top of (FROM) and the version tag to use
-base-image: ghcr.io/ublue-os/silverblue-main
-image-version: 42 # latest is also supported if you want new updates ASAP
+name: homelab-coreos-minipc
+description: Frontend application node for homelab - handles Jellyfin, Plex, Overseerr, Nextcloud, and Immich with hardware transcoding
 
-# module configuration, executed in order
-# you can include multiple instances of the same module
+# Base on uCore for immutable container-focused OS
+base-image: ghcr.io/ublue-os/ucore
+image-version: stable # Use stable for production, or 'latest' for newest features
+
+# Module configuration - executed in order
 modules:
+  # Install required system packages
+  - type: dnf
+    install:
+      packages:
+        # Network utilities
+        - wireguard-tools      # VPN for VPS tunnel
+        - nfs-utils            # NFS client for file server mounts
+        - tcpdump              # Network debugging
+        - iperf3               # Network performance testing
+
+        # Container runtime and orchestration
+        - docker-ce            # Docker for running containers
+        - docker-ce-cli
+        - docker-compose-plugin
+
+        # Hardware support
+        - intel-media-driver   # Intel QuickSync support
+        - libva-utils          # VA-API verification tools
+        - mesa-dri-drivers     # GPU drivers
+
+        # System management
+        - htop                 # System monitoring
+        - iotop                # I/O monitoring
+        - tmux                 # Terminal multiplexer
+        - vim                  # Text editor
+
+        # Security
+        - ufw                  # Firewall management
+        - fail2ban             # Intrusion prevention
+
+  # Copy system configuration files
   - type: files
     files:
       - source: system
-        destination: / # copies files/system/* (* means everything inside it) into your image's root folder /
+        destination: /
 
-  - type: dnf
-    repos:
-      copr:
-        - atim/starship
-    install:
-      packages:
-        - micro
-        - starship
-    remove:
-      packages:
-        # example: removing firefox (in favor of the flatpak)
-        # "firefox" is the main package, "firefox-langpacks" is a dependency
-        - firefox
-        - firefox-langpacks # also remove firefox dependency (not required for all packages, this is a special case)
+  # Enable required systemd services
+  - type: systemd
+    system:
+      enabled:
+        - docker.service
+        - wg-quick@wg0.service
+        - mnt-nas-media.mount
+        - mnt-nas-nextcloud.mount
+        - mnt-nas-immich.mount
+        - ufw.service
+        - fail2ban.service
 
-  - type: default-flatpaks
-    configurations:
-      - notify: true # Send notification after install/uninstall is finished (true/false)
-        scope: system
-        # If no repo information is specified, Flathub will be used by default
-        install: # system flatpaks we want all users to have and not remove
-          - org.mozilla.firefox
-          - org.gnome.Loupe
-      - scope: user # Also add Flathub user repo, but no user packages
-
-  - type: signing # this sets up the proper policy & signing files for signed images to work fully
+  # Set up proper signing for verified images
+  - type: signing
