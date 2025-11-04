@@ -1,0 +1,38 @@
+# WireGuard VPN Configuration for NAB9 Mini PC
+# This connects the mini PC to the DigitalOcean VPS for secure tunneling
+# IMPORTANT: Replace placeholders with actual values before deployment
+
+[Interface]
+# NAB9 Mini PC configuration
+Address = 10.99.0.2/24
+PrivateKey = YOUR_PRIVATE_KEY_HERE
+ListenPort = 51820
+
+# DNS through the tunnel (optional - use VPS or local DNS)
+# DNS = 1.1.1.1, 1.0.0.1
+
+# Routing table (optional - for policy-based routing)
+# Table = auto
+
+# MTU optimization for better performance
+MTU = 1420
+
+# PostUp/PreDown scripts for firewall rules
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PreDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+[Peer]
+# DigitalOcean VPS endpoint
+PublicKey = VPS_PUBLIC_KEY_HERE
+PresharedKey = PRESHARED_KEY_HERE
+
+# VPS endpoint address and port
+Endpoint = YOUR_VPS_IP:51820
+
+# Allowed IPs - what traffic goes through the tunnel
+# For full tunnel: AllowedIPs = 0.0.0.0/0, ::/0
+# For split tunnel (recommended): AllowedIPs = 10.99.0.0/24
+AllowedIPs = 10.99.0.0/24
+
+# Keep connection alive (important for NAT traversal)
+PersistentKeepalive = 25

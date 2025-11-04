@@ -1,45 +1,41 @@
 ---
 # yaml-language-server: $schema=https://schema.blue-build.org/recipe-v1.json
-# image will be published to ghcr.io/<user>/<name>
-name: homelab-coreos
-# description will be included in the image's metadata
-description: This is my personal OS image.
+name: homelab-coreos-minipc
+description: Frontend application node for NAB9 mini PC
 
 # the base image to build on top of (FROM) and the version tag to use
 base-image: ghcr.io/ublue-os/ucore
 image-version: stable
 
-# module configuration, executed in order
-# you can include multiple instances of the same module
 modules:
+  # Enable RPM Fusion repos for intel-media-driver and ffmpeg
+  - type: rpm-ostree
+    install:
+      - https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-%OS_VERSION%.noarch.rpm
+      - https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-%OS_VERSION%.noarch.rpm
+
+  - type: rpm-ostree
+    install:
+      # Intel VAAPI hardware acceleration packages
+      - intel-media-driver      # iHD driver for Intel Gen 8+ (Broadwell and newer)
+      - libva                   # VAAPI core library
+      - libva-utils             # vainfo and debugging tools
+      - ffmpeg                  # Hardware-accelerated encoding/decoding
+      - gstreamer1-vaapi        # GStreamer VAAPI plugin
+
+  # Copy system configuration files (includes /etc/profile.d/intel-vaapi.sh)
   - type: files
     files:
       - source: system
-        destination: / # copies files/system/* (* means everything inside it) into your image's root folder /
+        destination: /
 
-  - type: dnf
-    repos:
-      copr:
-        - atim/starship
-    install:
-      packages:
-        - micro
-        - starship
-    remove:
-      packages:
-        # example: removing firefox (in favor of the flatpak)
-        # "firefox" is the main package, "firefox-langpacks" is a dependency
-        - firefox
-        - firefox-langpacks # also remove firefox dependency (not required for all packages, this is a special case)
+  # Enable systemd units for WireGuard and NFS mounts
+  - type: systemd
+    system:
+      enabled:
+        - wg-quick@wg0.service
+        - mnt-nas-media.mount
+        - mnt-nas-nextcloud.mount
+        - mnt-nas-immich.mount
 
-  - type: default-flatpaks
-    configurations:
-      - notify: true # Send notification after install/uninstall is finished (true/false)
-        scope: system
-        # If no repo information is specified, Flathub will be used by default
-        install: # system flatpaks we want all users to have and not remove
-          - org.mozilla.firefox
-          - org.gnome.Loupe
-      - scope: user # Also add Flathub user repo, but no user packages
-
-  - type: signing # this sets up the proper policy & signing files for signed images to work fully
+  - type: signing

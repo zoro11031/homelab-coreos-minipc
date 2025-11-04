@@ -189,17 +189,19 @@ On boot:
 3. The media stack starts via the Compose systemd service.  
 4. Optional timers run health checks and log status.
 
----
+## Setup
 
-## Philosophy
+1. Configure WireGuard: `cp config/wireguard/wg0.conf.template config/wireguard/wg0.conf`
+2. Configure compose: `cp compose/.env.example compose/.env`
+3. Update NFS mount IPs in `files/system/etc/systemd/system/*.mount`
+4. Deploy: `cd compose && docker compose -f media.yml -f web.yml -f cloud.yml up -d`
 
-- **Declarative over click-ops:** The system is described in Git, not in wizards.  
-- **Frontend vs backend separation:** This node runs the apps; the other holds the bits.  
-- **Immutable host:** No ad-hoc package installs. Everything goes through the image.  
-- **Fast rebuilds:** Reflash → rebase → reboot gets you back to the same state.
+## Network
 
----
+- Direct access: Plex (32400), Jellyfin (8096/8920)
+- VPS tunnel: Everything else via WireGuard (10.99.0.0/24)
+- NFS: Media from 192.168.7.10
 
-## License
+## Base Image
 
-MIT License — see `LICENSE` for details.
+Built on `ghcr.io/ublue-os/ucore:latest` with WireGuard, NFS, and Intel media drivers.
