@@ -1,6 +1,6 @@
-# homelab-coreos-minipc
+# homelab-coreos-minipc &nbsp; [![build](https://github.com/zoro11031/homelab-coreos-minipc/actions/workflows/build.yml/badge.svg)](https://github.com/zoro11031/homelab-coreos-minipc/actions/workflows/build.yml)
 
-This repository defines the **frontend application node** for my homelab — a declarative **uCore (Ublue CoreOS)** build that runs all user-facing services on a NAB9 mini PC.  
+This repository defines the **frontend application node** for my homelab — a declarative **uCore (Ublue CoreOS)** build that runs all user-facing services on a NAB9 mini PC.
 It pulls media from the file server over NFS and exposes services to the internet via direct ports and a WireGuard-linked VPS.
 
 ---
@@ -120,20 +120,53 @@ These mounts are used by Plex, Jellyfin, Nextcloud, Immich, etc.
 
 ---
 
+## Installation
+
+### Rebase from Existing Fedora Atomic
+
+1. Begin from any Fedora Atomic base (Silverblue/Kinoite/uBlue).
+2. Rebase, reboot, then move to the signed image:
+
+   ```bash
+   rpm-ostree rebase ostree-unverified-registry:ghcr.io/zoro11031/homelab-coreos-minipc:latest
+   systemctl reboot
+   rpm-ostree rebase ostree-image-signed:docker://ghcr.io/zoro11031/homelab-coreos-minipc:latest
+   systemctl reboot
+   ```
+
+### Generate and Install from ISO
+
+Generate the ISO:
+
+```bash
+# Generate ISO from a built and published remote image
+sudo bluebuild generate-iso --iso-name homelab-coreos-minipc.iso image ghcr.io/zoro11031/homelab-coreos-minipc
+
+# Build image and generate ISO from a local recipe
+sudo bluebuild generate-iso --iso-name homelab-coreos-minipc.iso recipe recipe.yml
+```
+
+Flash the ISO onto a USB drive (Fedora Media Writer is recommended) and boot it.
+- The ISO file should be inside your working directory (wherever you ran the command).
+
+---
+
 ## Updates & Rollbacks
 
 ### Update the OS
 
-    sudo rpm-ostree upgrade
-    sudo systemctl reboot
+```bash
+sudo rpm-ostree upgrade
+sudo systemctl reboot
+```
 
-### Rebase to a New Image
-
-    rpm-ostree rebase ostree-unverified-registry:ghcr.io/<user>/homelab-coreos-minipc:latest
+### Rollback
 
 If something goes sideways:
 
-    rpm-ostree rollback
+```bash
+rpm-ostree rollback
+```
 
 ---
 
