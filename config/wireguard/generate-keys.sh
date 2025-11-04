@@ -8,6 +8,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
 KEYS_DIR="$SCRIPT_DIR/keys"
 
+DEFAULT_INTERFACE=""
+OUTBOUND_INTERFACE_VALUE=""
+OUTBOUND_INTERFACE_COMMENT=""
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -21,6 +25,20 @@ if ! command -v wg &> /dev/null; then
     echo -e "${RED}Error: wireguard-tools is not installed${NC}"
     echo "Install it with: sudo dnf install wireguard-tools"
     exit 1
+fi
+
+if command -v ip &> /dev/null; then
+    DEFAULT_INTERFACE="$(ip -o route show to default 2>/dev/null | awk '{print $5; exit}')"
+fi
+
+if [ -n "$DEFAULT_INTERFACE" ]; then
+    OUTBOUND_INTERFACE_VALUE="$DEFAULT_INTERFACE"
+    OUTBOUND_INTERFACE_COMMENT="Detected default network interface. Confirm before use."
+    echo -e "${GREEN}Detected default WAN interface:${NC} $OUTBOUND_INTERFACE_VALUE"
+else
+    OUTBOUND_INTERFACE_VALUE="REPLACE_WITH_INTERFACE"
+    OUTBOUND_INTERFACE_COMMENT="Set to the network interface that provides WAN access (e.g., enp1s0)."
+    echo -e "${YELLOW}Warning:${NC} Unable to detect default WAN interface. Update WG_OUTBOUND_INTERFACE in .env manually."
 fi
 
 # Create keys directory if it doesn't exist
@@ -68,6 +86,10 @@ cat > "$ENV_FILE" << EOF
 # WireGuard Server Configuration
 # Generated on $(date)
 # DO NOT commit this file to git!
+
+# Network interface used for NAT (WAN)
+# ${OUTBOUND_INTERFACE_COMMENT}
+WG_OUTBOUND_INTERFACE=${OUTBOUND_INTERFACE_VALUE}
 
 # Server private key
 WG_SERVER_PRIVATE_KEY=$(cat "$KEYS_DIR/server-private.key")

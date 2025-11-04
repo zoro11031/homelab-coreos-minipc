@@ -68,6 +68,7 @@ PLACEHOLDERS=(
     "[IPHONE_PRESHARED_KEY]"
     "[LAPTOP_PUBLIC_KEY]"
     "[LAPTOP_PRESHARED_KEY]"
+    "[OUTBOUND_INTERFACE]"
 )
 
 for placeholder in "${PLACEHOLDERS[@]}"; do
@@ -107,6 +108,29 @@ replace_placeholder() {
     fi
 }
 
+if [ -z "${WG_OUTBOUND_INTERFACE:-}" ]; then
+    if command -v ip &> /dev/null; then
+        AUTO_INTERFACE="$(ip -o route show to default 2>/dev/null | awk '{print $5; exit}')"
+        if [ -n "$AUTO_INTERFACE" ]; then
+            WG_OUTBOUND_INTERFACE="$AUTO_INTERFACE"
+            echo -e "${YELLOW}Info:${NC} WG_OUTBOUND_INTERFACE not set. Using detected interface: $WG_OUTBOUND_INTERFACE"
+        else
+            echo -e "${RED}Error: WG_OUTBOUND_INTERFACE is not set in .env and automatic detection failed.${NC}" >&2
+            echo "Set WG_OUTBOUND_INTERFACE in .env to your WAN interface (e.g., enp1s0) and re-run this script." >&2
+            exit 1
+        fi
+    else
+        echo -e "${RED}Error: WG_OUTBOUND_INTERFACE is not set in .env and automatic detection is unavailable (ip command missing).${NC}" >&2
+        exit 1
+    fi
+fi
+
+if [[ "$WG_OUTBOUND_INTERFACE" == "REPLACE_WITH_INTERFACE" ]]; then
+    echo -e "${RED}Error: WG_OUTBOUND_INTERFACE in .env is still set to the placeholder value.${NC}" >&2
+    echo "Update it to the interface that provides WAN access (e.g., enp1s0) and re-run this script." >&2
+    exit 1
+fi
+
 replace_placeholder "[SERVER_PRIVATE_KEY]" "$WG_SERVER_PRIVATE_KEY"
 replace_placeholder "[DESKTOP_PUBLIC_KEY]" "$WG_PEER_DESKTOP_PUBLIC_KEY"
 replace_placeholder "[DESKTOP_PRESHARED_KEY]" "$WG_PEER_DESKTOP_PRESHARED_KEY"
@@ -116,6 +140,7 @@ replace_placeholder "[IPHONE_PUBLIC_KEY]" "$WG_PEER_IPHONE_PUBLIC_KEY"
 replace_placeholder "[IPHONE_PRESHARED_KEY]" "$WG_PEER_IPHONE_PRESHARED_KEY"
 replace_placeholder "[LAPTOP_PUBLIC_KEY]" "$WG_PEER_LAPTOP_PUBLIC_KEY"
 replace_placeholder "[LAPTOP_PRESHARED_KEY]" "$WG_PEER_LAPTOP_PRESHARED_KEY"
+replace_placeholder "[OUTBOUND_INTERFACE]" "$WG_OUTBOUND_INTERFACE"
 
 if grep -Eo '\[[A-Z_]*KEY[A-Z_]*\]' "$TEMP_FILE" | grep -q "^\["; then
     echo -e "${RED}Error: Unresolved placeholders remain after substitution${NC}" >&2

@@ -6,9 +6,8 @@ Address=10.253.0.1/24
 ListenPort=51820
 
 # Enable IP forwarding and NAT for WireGuard clients
-# Replace 'eth0' with your primary network interface (e.g., enp1s0, eno1)
-PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -A FORWARD -o %i -j ACCEPT; iptables -t nat -A POSTROUTING -o [OUTBOUND_INTERFACE] -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACCEPT; iptables -t nat -D POSTROUTING -o [OUTBOUND_INTERFACE] -j MASQUERADE
 
 [Peer]
 #LAN-Desktop-Justin
