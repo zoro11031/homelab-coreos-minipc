@@ -9,6 +9,7 @@ cosign.private
 config/wireguard/wg0.conf
 config/wireguard/.env
 config/wireguard/keys/
+config/wireguard/peer-configs/
 config/wireguard/*.key
 *.key
 *.pem
