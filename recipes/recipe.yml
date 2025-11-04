@@ -10,10 +10,8 @@ modules:
   - type: dnf
     install:
       packages:
-        - wireguard-tools
-        - nfs-utils
+        - libva-intel-driver
         - intel-media-driver
-        - libva-utils
 
   - type: files
     files:
