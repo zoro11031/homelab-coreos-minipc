@@ -1,7 +1,7 @@
 # Local server configuration
 
 [Interface]
-PrivateKey=[PRIVATE KEY]
+PrivateKey=[SERVER_PRIVATE_KEY]
 Address=10.253.0.1/24
 ListenPort=51820
 
@@ -12,28 +12,28 @@ PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -D FORWARD -o %i -j ACC
 
 [Peer]
 #LAN-Desktop-Justin
-PublicKey=[PUBLIC KEY]
-PresharedKey=[PRESHARED KEY]
+PublicKey=[DESKTOP_PUBLIC_KEY]
+PresharedKey=[DESKTOP_PRESHARED_KEY]
 AllowedIPs=10.253.0.6/32
 PersistentKeepalive=30
 
 [Peer]
 #VPS
-PublicKey=[PUBLIC KEY]
-PresharedKey=[PRESHARED KEY]
+PublicKey=[VPS_PUBLIC_KEY]
+PresharedKey=[VPS_PRESHARED_KEY]
 AllowedIPs=10.253.0.8/32
 PersistentKeepalive=30
 
 [Peer]
 #iPhone
-PublicKey=[PUBLIC KEY]
-PresharedKey=[PRESHARED KEY]
+PublicKey=[IPHONE_PUBLIC_KEY]
+PresharedKey=[IPHONE_PRESHARED_KEY]
 AllowedIPs=10.253.0.9/32
 PersistentKeepalive=30
 
 [Peer]
 #Framework Laptop Justin
-PublicKey=[PUBLIC KEY]
-PresharedKey=[PRESHARED KEY]
+PublicKey=[LAPTOP_PUBLIC_KEY]
+PresharedKey=[LAPTOP_PRESHARED_KEY]
 AllowedIPs=10.253.0.11/32
 PersistentKeepalive=30
