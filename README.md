@@ -162,7 +162,7 @@ The mini PC acts as a WireGuard server with the following configuration:
 - iPhone: `10.253.0.9/32`
 - Framework Laptop Justin: `10.253.0.11/32`
 
-Config template is in `config/wireguard/wg0.conf.template`. Use the setup scripts to generate keys and deploy to `/etc/wireguard/wg0.conf`. The service autostarts with `wg-quick@wg0.service`.
+Config template is in `config/wireguard/wg0.conf.template`. Use the setup scripts in `files/setup_scripts/` to generate keys and deploy to `/etc/wireguard/wg0.conf`. The service autostarts with `wg-quick@wg0.service`.
 
 ### NFS Mounts
 
