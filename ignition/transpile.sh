@@ -5,7 +5,6 @@
 
 set -e
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUTANE_FILE="${1:-config.bu}"
 IGNITION_FILE="${2:-config.ign}"
 
