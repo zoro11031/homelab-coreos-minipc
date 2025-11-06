@@ -198,8 +198,8 @@ These mounts are used by Plex, Jellyfin, Nextcloud, Immich, etc.
    ```
 
 4. Edit `config.bu` and:
-   - Replace `YOUR_PASSWORD_HASH` with the generated hash
-   - Replace the example SSH key with your actual public key (`~/.ssh/id_ed25519.pub`)
+   - Replace `YOUR_GOOD_PASSWORD_HASH_HERE` with the generated hash
+   - Replace `YOUR_SSH_PUB_KEY_HERE` with your actual public key (`~/.ssh/id_ed25519.pub`)
 
 5. Transpile to Ignition JSON:
    ```bash
