@@ -19,6 +19,8 @@ modules:
     files:
       - source: dotfiles
         destination: /var/home/core/.dotfiles
+        user: core
+        group: core
   - from-file: systemd.yml
 
   - type: signing
