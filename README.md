@@ -178,7 +178,8 @@ These mounts are used by Plex, Jellyfin, Nextcloud, Immich, etc.
 
 ## Ignition Setup (First-Time Installation)
 
-**All CoreOS installations require an Ignition file** to configure the system on first boot. At minimum, you must set a password and SSH key for the default `core` user.
+**All CoreOS-family installations require an Ignition file** to configure the system on first boot.
+At minimum, you must set a password and SSH key for the default `core` user.
 
 ### Quick Setup
 
@@ -197,62 +198,101 @@ These mounts are used by Plex, Jellyfin, Nextcloud, Immich, etc.
    ./generate-password-hash.sh
    ```
 
-4. Edit `config.bu` and:
-   - Replace `YOUR_GOOD_PASSWORD_HASH_HERE` with the generated hash
-   - Replace `YOUR_SSH_PUB_KEY_HERE` with your actual public key (`~/.ssh/id_ed25519.pub`)
+4. Edit `config.bu` and update:
+   - `YOUR_GOOD_PASSWORD_HASH_HERE` → your generated password hash
+   - `YOUR_SSH_PUB_KEY_HERE` → your SSH public key (e.g. `~/.ssh/id_ed25519.pub`)
 
 5. Transpile to Ignition JSON:
    ```bash
    ./transpile.sh config.bu config.ign
    ```
 
-6. Use the generated `config.ign` file during installation (see methods below)
+6. Use `config.ign` during installation (see methods below).
 
-**Note**: The Ignition configuration includes automatic rebase services that will reboot your system **twice** after first boot to transition from the base CoreOS image to your custom signed image. This is normal and expected.
+**Note:**
+This Ignition file includes automatic rebase services that transition the system from the base CoreOS image to your custom uCore image.
+Your system will reboot **twice** after the first boot — once to move to the unsigned OCI image, and once more to the signed OCI image.
+This behavior is **expected** and indicates the autorebase process is working.
 
-If you plan to generate a uCore ISO directly from the published container image (see `bluebuild generate-iso` instructions below) and embed this Ignition file into that ISO, remove the auto-rebase units before transpiling. In that workflow the installed system already boots into the target image, so keeping the rebase services will cause unnecessary extra reboots. See [`ignition/README.md`](ignition/README.md#disabling-the-automatic-rebase-units) for the exact edits.
-
-For detailed instructions, see [`ignition/README.md`](ignition/README.md).
+If you plan to generate a uCore ISO directly from the built container image (using `bluebuild generate-iso`), **remove** these autorebase units before transpiling.
+In that case, the installed image already boots into the target, and the autorebase units would cause redundant reboots.
+See [`ignition/README.md`](ignition/README.md#disabling-the-automatic-rebase-units) for details.
 
 ---
 
 ## Installation
 
-### Rebase from Existing Fedora Atomic
+### Option A: Install via Fedora CoreOS Live ISO (Recommended)
 
-1. Begin from any Fedora Atomic base (Silverblue/Kinoite/uBlue).
-2. Rebase, reboot, then move to the signed image:
+1. Prepare your Ignition file (`config.ign`) as shown above.
 
+2. Download a **Fedora CoreOS live ISO** (not a uCore ISO):
+   [https://fedoraproject.org/coreos/download/](https://fedoraproject.org/coreos/download/)
+
+3. Boot from the ISO and install uCore with Ignition:
    ```bash
-   rpm-ostree rebase ostree-unverified-registry:ghcr.io/zoro11031/homelab-coreos-minipc:latest
-   systemctl reboot
-   rpm-ostree rebase ostree-image-signed:docker://ghcr.io/zoro11031/homelab-coreos-minipc:latest
-   systemctl reboot
+   sudo coreos-installer install /dev/sdX \
+     --image-url https://github.com/ublue-os/ucore/releases/download/latest/ucore-x86_64.raw.xz \
+     --ignition-file ignition/config.ign
+   ```
+   Replace `/dev/sdX` with your target drive (e.g. `/dev/nvme0n1`).
+
+4. On first boot:
+   - The system applies your Ignition configuration.
+   - Then it automatically rebases twice:
+     - First to the **unsigned** OCI image.
+     - Then to the **signed** OCI image.
+   - After both reboots, it will be running your final, signed `homelab-coreos-minipc` image.
+
+---
+
+### Option B: Generate a Custom ISO (Advanced Workflow)
+
+If you want a standalone ISO that already contains your custom image:
+
+1. Build or reference your image:
+   ```bash
+   sudo bluebuild generate-iso --iso-name homelab-coreos-minipc.iso \
+     image ghcr.io/zoro11031/homelab-coreos-minipc
    ```
 
-### Generate and Install from ISO
-
-1. First, prepare your Ignition file (see **Ignition Setup** section above)
-
-2. Generate the ISO:
-
+   Or from a local recipe:
    ```bash
-   # Generate ISO from a built and published remote image
-   sudo bluebuild generate-iso --iso-name homelab-coreos-minipc.iso image ghcr.io/zoro11031/homelab-coreos-minipc
-
-   # Build image and generate ISO from a local recipe
-   sudo bluebuild generate-iso --iso-name homelab-coreos-minipc.iso recipe recipe.yml
+   sudo bluebuild generate-iso --iso-name homelab-coreos-minipc.iso \
+     recipe recipe.yml
    ```
 
-3. Embed your Ignition config into the ISO:
+2. **Do not use `coreos-installer iso ignition embed`** on uCore or uBlue-generated ISOs —
+   they are not CoreOS live ISOs and do not support embedding.
+   Use the installer-based Ignition method from Option A instead.
 
-   ```bash
-   coreos-installer iso ignition embed -i ignition/config.ign homelab-coreos-minipc.iso
-   ```
+3. Flash your ISO with Fedora Media Writer, Ventoy, or `dd`, and boot.
 
-4. Flash the ISO onto a USB drive (Fedora Media Writer is recommended) and boot it.
-   - The ISO file should be inside your working directory (wherever you ran the command)
-   - On first boot, the system will be automatically configured using the embedded Ignition file
+---
+
+### Option C: Rebase Manually (Alternate Path)
+
+If you are already running Fedora Atomic (Silverblue, Kinoite, or uBlue) and don't want to reinstall:
+
+```bash
+rpm-ostree rebase ostree-unverified-registry:ghcr.io/zoro11031/homelab-coreos-minipc:latest
+systemctl reboot
+# After reboot, finalize to signed image
+rpm-ostree rebase ostree-image-signed:docker://ghcr.io/zoro11031/homelab-coreos-minipc:latest
+systemctl reboot
+```
+
+This path skips Ignition entirely and is for converting an existing installation.
+
+---
+
+### Summary of Behavior
+
+| Scenario                   | Ignition Used | Automatic Rebase | Manual Steps           |
+|----------------------------|---------------|------------------|------------------------|
+| Fresh install via FCOS ISO | ✅            | ✅               | None — fully automated |
+| Custom uCore ISO install   | ❌            | N/A              | Already final image    |
+| Existing Fedora Atomic     | ❌            | ❌               | Manual rebase required |
 
 ---
 
