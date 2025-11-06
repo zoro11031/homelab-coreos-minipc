@@ -23,7 +23,6 @@ modules:
       - vim                     # Traditional Vim editor for compatibility
       - fzf                     # Command-line fuzzy finder
       - zoxide                  # Smarter cd command
-      - ghostty                 # GPU-accelerated terminal emulator
       - kitty                   # Feature-rich GPU terminal emulator
       - ripgrep                 # Fast recursive search utility
       - fd-find                 # Simple, fast alternative to find
