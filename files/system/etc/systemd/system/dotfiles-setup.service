@@ -11,6 +11,7 @@ Group=core
 Environment=HOME=/var/home/core
 ExecStart=/usr/bin/bash -c 'set -euo pipefail; \
   DOTFILES_DIR="/var/home/core/.dotfiles"; \
+  USER_HOME="/var/home/core"; \
   if [ ! -d "$DOTFILES_DIR" ]; then \
     git clone https://github.com/zoro11031/dotfiles.git "$DOTFILES_DIR"; \
   else \
@@ -19,6 +20,12 @@ ExecStart=/usr/bin/bash -c 'set -euo pipefail; \
   cd "$DOTFILES_DIR"; \
   if [ -f install.sh ]; then \
     bash install.sh; \
+  else \
+    for dir in */; do \
+      if [ -d "$dir" ]; then \
+        stow -v -t "$USER_HOME" "${dir%/}"; \
+      fi; \
+    done; \
   fi; \
   touch /var/home/core/.dotfiles-setup-complete'
 RemainAfterExit=yes
