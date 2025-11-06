@@ -19,3 +19,23 @@ modules:
       - zsh                     # Z shell
       - git                     # Required for dotfiles setup
       - stow                    # GNU Stow for dotfiles management
+      - neovim                  # Editor expected by dotfiles
+      - vim                     # Traditional Vim editor for compatibility
+      - fzf                     # Command-line fuzzy finder
+      - zoxide                  # Smarter cd command
+      - ghostty                 # GPU-accelerated terminal emulator
+      - kitty                   # Feature-rich GPU terminal emulator
+      - ripgrep                 # Fast recursive search utility
+      - fd-find                 # Simple, fast alternative to find
+      - bat                     # cat clone with syntax highlighting
+      - tmux                    # Terminal multiplexer for sessions
+      - htop                    # Interactive process viewer
+      - tree                    # Directory tree listing
+
+      # Core CLI productivity tools
+      - jq                      # JSON processor
+      - rsync                   # Fast incremental file transfer
+      - wget                    # Network downloader
+      - curl                    # Data transfer tool supporting multiple protocols
+      - unzip                   # Zip archive extraction utility
+      - zip                     # Create Zip archives
