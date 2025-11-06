@@ -14,3 +14,8 @@ modules:
       - libva-utils             # vainfo and debugging tools
       - ffmpeg                  # Hardware-accelerated encoding/decoding
       - gstreamer1-vaapi        # GStreamer VAAPI plugin
+
+      # Shell and utilities
+      - zsh                     # Z shell
+      - git                     # Required for dotfiles setup
+      - stow                    # GNU Stow for dotfiles management

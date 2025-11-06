@@ -1,0 +1,27 @@
+[Unit]
+Description=Setup zsh dotfiles for core user
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=!/var/home/core/.dotfiles-setup-complete
+
+[Service]
+Type=oneshot
+User=core
+Group=core
+Environment=HOME=/var/home/core
+ExecStart=/usr/bin/bash -c 'set -euo pipefail; \
+  DOTFILES_DIR="/var/home/core/.dotfiles"; \
+  if [ ! -d "$DOTFILES_DIR" ]; then \
+    git clone https://github.com/zoro11031/dotfiles.git "$DOTFILES_DIR"; \
+  else \
+    cd "$DOTFILES_DIR" && git pull; \
+  fi; \
+  cd "$DOTFILES_DIR"; \
+  if [ -f install.sh ]; then \
+    bash install.sh; \
+  fi; \
+  touch /var/home/core/.dotfiles-setup-complete'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

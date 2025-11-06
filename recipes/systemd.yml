@@ -7,3 +7,4 @@ system:
     - mnt-nas-media.mount
     - mnt-nas-nextcloud.mount
     - mnt-nas-immich.mount
+    - dotfiles-setup.service

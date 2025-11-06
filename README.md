@@ -94,12 +94,13 @@ It pulls media from the file server over NFS and exposes services to the interne
 
 ### Base Image
 
-- Base: https://github.com/ublue-os/ucore  
-- Custom image: `ghcr.io/<user>/homelab-coreos-minipc:latest`  
+- Base: https://github.com/ublue-os/ucore
+- Custom image: `ghcr.io/<user>/homelab-coreos-minipc:latest`
 - Built with a BlueBuild recipe that:
-  - Installs `wireguard-tools`, `docker`, `nfs-utils`, `fail2ban`.
+  - Installs `wireguard-tools`, `docker`, `nfs-utils`, `fail2ban`, `zsh`, and Intel VAAPI drivers.
   - Layers `/etc/wireguard/wg0.conf` (template) and systemd units.
   - Declares NFS mounts and a Compose service to start the stack at boot.
+  - Automatically sets up zsh with dotfiles from https://github.com/zoro11031/dotfiles on first boot.
 
 ---
 
@@ -384,6 +385,30 @@ docker compose -f media.yml -f web.yml -f cloud.yml up -d
 - WireGuard VPN: Server on 10.253.0.0/24 for remote access and VPS tunnel
 - NFS: Media from 192.168.7.10
 
+## Shell Configuration
+
+The image includes zsh with automatic dotfiles setup:
+
+- **Zsh Shell**: Installed and configured as the default shell
+- **Dotfiles**: Automatically cloned from https://github.com/zoro11031/dotfiles on first boot
+- **Setup Service**: A systemd service (`dotfiles-setup.service`) runs once on first boot to:
+  - Clone the dotfiles repository to `/var/home/core/.dotfiles`
+  - Run the installation script to set up shell configuration
+  - Install zsh configuration including `.zshrc` and Powerlevel10k theme
+
+The dotfiles are managed with GNU Stow and include configurations for:
+- Zsh with Powerlevel10k prompt
+- Vim/Neovim
+- Tmux
+- Git aliases and settings
+
+To manually re-run the dotfiles setup:
+```bash
+cd ~/.dotfiles
+git pull
+bash install.sh
+```
+
 ## Base Image
 
-Built on `ghcr.io/ublue-os/ucore:latest` with WireGuard, NFS, and Intel media drivers.
+Built on `ghcr.io/ublue-os/ucore:latest` with WireGuard, NFS, zsh, and Intel media drivers.
