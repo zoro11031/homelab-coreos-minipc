@@ -8,6 +8,9 @@ base-image: ghcr.io/ublue-os/ucore
 image-version: stable
 
 modules:
+  - type: script
+    scripts:
+      - install-rpmfusion-release.sh
   - from-file: packages.yml
   # Copy system configuration files (includes /etc/profile.d/intel-vaapi.sh)
   - type: files

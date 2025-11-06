@@ -389,17 +389,12 @@ docker compose -f media.yml -f web.yml -f cloud.yml up -d
 
 The image includes zsh and a dotfiles directory:
 
-- **Zsh Shell**: Installed and available for use
-- **Dotfiles Directory**: An empty `.dotfiles` directory is created at `/var/home/core/.dotfiles`
-  - Place your dotfiles in `files/dotfiles/` before building the image
-  - The directory will be copied to `/var/home/core/.dotfiles` during the build
-  - You can organize your configuration files (`.zshrc`, `.vimrc`, `.tmux.conf`, etc.) as needed
-  - Consider using GNU Stow or a similar tool to manage your dotfiles
+- **Zsh Shell**: Installed and configured as the default shell
+- **Setup Service**: A systemd service (`dotfiles-setup.service`) runs once on first boot to:
+  - Clone the dotfiles to `/var/home/core/.dotfiles`
+  - Run the installation script to set up shell configuration
+  - Install zsh configuration including `.zshrc` and Powerlevel10k theme
 
-To add your dotfiles to the image:
-1. Place your dotfiles in the `files/dotfiles/` directory
-2. Rebuild the image
-3. The files will be available at `/var/home/core/.dotfiles` on boot
 
 ## Base Image
 
