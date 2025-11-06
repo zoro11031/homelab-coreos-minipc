@@ -1,12 +1,14 @@
 [Unit]
 Description=Home directory setup for core user
 After=multi-user.target
+ConditionPathExists=!/var/home/core/.home-setup-complete
 
 [Service]
 Type=oneshot
 ExecStart=/bin/bash /usr/share/setup-scripts/dotfiles.sh
 ExecStart=/bin/bash /usr/share/setup-scripts/compose.sh
 ExecStart=/bin/bash /usr/share/setup-scripts/wireguard.sh
+ExecStartPost=/usr/bin/touch /var/home/core/.home-setup-complete
 RemainAfterExit=yes
 
 [Install]
