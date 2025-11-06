@@ -100,7 +100,7 @@ It pulls media from the file server over NFS and exposes services to the interne
   - Installs `wireguard-tools`, `docker`, `nfs-utils`, `fail2ban`, `zsh`, and Intel VAAPI drivers.
   - Layers `/etc/wireguard/wg0.conf` (template) and systemd units.
   - Declares NFS mounts and a Compose service to start the stack at boot.
-  - Automatically sets up zsh with dotfiles from https://github.com/zoro11031/dotfiles on first boot.
+  - Copies an empty `.dotfiles` directory to the core user's home where you can place your dotfiles.
 
 ---
 
@@ -387,27 +387,19 @@ docker compose -f media.yml -f web.yml -f cloud.yml up -d
 
 ## Shell Configuration
 
-The image includes zsh with automatic dotfiles setup:
+The image includes zsh and a dotfiles directory:
 
-- **Zsh Shell**: Installed and configured as the default shell
-- **Dotfiles**: Automatically cloned from https://github.com/zoro11031/dotfiles on first boot
-- **Setup Service**: A systemd service (`dotfiles-setup.service`) runs once on first boot to:
-  - Clone the dotfiles repository to `/var/home/core/.dotfiles`
-  - Run the installation script to set up shell configuration
-  - Install zsh configuration including `.zshrc` and Powerlevel10k theme
+- **Zsh Shell**: Installed and available for use
+- **Dotfiles Directory**: An empty `.dotfiles` directory is created at `/var/home/core/.dotfiles`
+  - Place your dotfiles in `files/dotfiles/` before building the image
+  - The directory will be copied to `/var/home/core/.dotfiles` during the build
+  - You can organize your configuration files (`.zshrc`, `.vimrc`, `.tmuxrc`, etc.) as needed
+  - Consider using GNU Stow or a similar tool to manage your dotfiles
 
-The dotfiles are managed with GNU Stow and include configurations for:
-- Zsh with Powerlevel10k prompt
-- Vim/Neovim
-- Tmux
-- Git aliases and settings
-
-To manually re-run the dotfiles setup:
-```bash
-cd ~/.dotfiles
-git pull
-bash install.sh
-```
+To add your dotfiles to the image:
+1. Place your dotfiles in the `files/dotfiles/` directory
+2. Rebuild the image
+3. The files will be available at `/var/home/core/.dotfiles` on boot
 
 ## Base Image
 
