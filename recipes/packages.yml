@@ -2,11 +2,9 @@
 # yaml-language-server: $schema=https://schema.blue-build.org/module-list-v1.json
 modules:
   - type: rpm-ostree
-    install:
-      - https://mirrors.rpmfusion.org/free/fedora/rpmfusion-free-release-%OS_VERSION%.noarch.rpm
-      - https://mirrors.rpmfusion.org/nonfree/fedora/rpmfusion-nonfree-release-%OS_VERSION%.noarch.rpm
-
-  - type: rpm-ostree
+    repos:
+      - https://copr.fedorainfracloud.org/coprs/scottames/ghostty/repo/fedora-%OS_VERSION%/scottames-ghostty-fedora-%OS_VERSION%.repo
+    
     install:
       # Intel VAAPI hardware acceleration packages
       - intel-media-driver      # iHD driver for Intel Gen 8+ (Broadwell and newer)
@@ -19,3 +17,18 @@ modules:
       - zsh                     # Z shell
       - git                     # Required for dotfiles setup
       - stow                    # GNU Stow for dotfiles management
+      - ghostty
+      - fastfetch
+      - neovim
+      - htop
+      - wget
+      - kitty
+      - fzf
+      - zoxide
+      - tmux
+      - tree
+      - rsync
+      - jq
+      - bat
+      - btop
+
