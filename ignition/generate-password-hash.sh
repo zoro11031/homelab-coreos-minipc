@@ -24,7 +24,7 @@ if command -v mkpasswd &> /dev/null; then
     fi
 
     echo "Generating password hash..."
-    HASH=$(echo "$PASSWORD" | mkpasswd --method=yescrypt --stdin)
+    HASH=$(mkpasswd --method=yescrypt --stdin <<< "$PASSWORD")
     echo ""
     echo "Password hash generated successfully:"
     echo "$HASH"
