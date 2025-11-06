@@ -178,45 +178,48 @@ These mounts are used by Plex, Jellyfin, Nextcloud, Immich, etc.
 
 ## Ignition Setup (First-Time Installation)
 
-**All CoreOS-family installations require an Ignition file** to configure the system on first boot.
-At minimum, you must set a password and SSH key for the default `core` user.
+Every CoreOS-family install expects an Ignition configuration on the very first boot.
+Without one, you cannot set a password or SSH key for the default `core` user.
+Follow the steps below **before** you boot any installer media.
+
+### Prerequisites
+
+- [`butane`](https://coreos.github.io/butane/) in your `$PATH` (used by `transpile.sh`)
+- `mkpasswd` (from the `whois` package on Debian/Ubuntu) to generate a password hash
+- An SSH key pair on the machine you're using to prepare the config
 
 ### Quick Setup
 
-1. Navigate to the `ignition/` directory:
+1. Navigate to the Ignition helpers and copy the template:
    ```bash
    cd ignition
-   ```
-
-2. Copy the template:
-   ```bash
    cp config.bu.template config.bu
    ```
 
-3. Generate a password hash:
+2. Generate a password hash for the `core` user:
    ```bash
    ./generate-password-hash.sh
    ```
+   Copy the printed yescrypt hash.
 
-4. Edit `config.bu` and update:
-   - `YOUR_GOOD_PASSWORD_HASH_HERE` → your generated password hash
-   - `YOUR_SSH_PUB_KEY_HERE` → your SSH public key (e.g. `~/.ssh/id_ed25519.pub`)
+3. Edit `config.bu` and replace the placeholders:
+   - `YOUR_GOOD_PASSWORD_HASH_HERE` → the hash from step 2
+   - `YOUR_SSH_PUB_KEY_HERE` → your SSH public key (`~/.ssh/id_ed25519.pub`, etc.)
+   - Adjust hostname, groups, or additional settings if needed
 
-5. Transpile to Ignition JSON:
+4. Convert the Butane file to Ignition JSON:
    ```bash
    ./transpile.sh config.bu config.ign
    ```
+   The script validates that you removed the placeholders and writes `config.ign`.
 
-6. Use `config.ign` during installation (see methods below).
+5. Keep `config.ign` handy for the installation method you plan to use (see below).
 
-**Note:**
-This Ignition file includes automatic rebase services that transition the system from the base CoreOS image to your custom uCore image.
-Your system will reboot **twice** after the first boot — once to move to the unsigned OCI image, and once more to the signed OCI image.
-This behavior is **expected** and indicates the autorebase process is working.
+**Automatic rebase behavior:** the bundled Butane template adds systemd units that move the host from stock Fedora CoreOS to the signed `ghcr.io/zoro11031/homelab-coreos-minipc:latest` image. Expect **two automatic reboots** after the first boot: one into the unsigned OCI reference and a second into the signed image. This is normal and confirms the autorebase workflow is active.
 
-If you plan to generate a uCore ISO directly from the built container image (using `bluebuild generate-iso`), **remove** these autorebase units before transpiling.
-In that case, the installed image already boots into the target, and the autorebase units would cause redundant reboots.
-See [`ignition/README.md`](ignition/README.md#disabling-the-automatic-rebase-units) for details.
+Using a custom ISO built from the final image (`bluebuild generate-iso ... image ghcr.io/zoro11031/homelab-coreos-minipc`)?
+Remove the autorebase units before running `transpile.sh`; otherwise you will sit through two unnecessary reboots.
+Detailed instructions live in [`ignition/README.md`](ignition/README.md#disabling-the-automatic-rebase-units).
 
 ---
 
@@ -224,48 +227,33 @@ See [`ignition/README.md`](ignition/README.md#disabling-the-automatic-rebase-uni
 
 ### Option A: Install via Fedora CoreOS Live ISO (Recommended)
 
-1. **Prepare your Ignition file** (`config.ign`) as shown in the Ignition Setup section above.
+1. **Finish the Ignition steps above** so you have a customized `config.ign`.
 
-2. **Download the latest Fedora CoreOS ISO**:
-
-   From the [download page](https://fedoraproject.org/coreos/download/), or using `podman`:
+2. **Download the latest Fedora CoreOS installer ISO** from the [official site](https://fedoraproject.org/coreos/download/) or with the containerized helper:
    ```bash
-   podman run --security-opt label=disable --pull=always --rm -v .:/data -w /data \
+   podman run --security-opt label=disable --pull=always --rm -v "$(pwd)":/data -w /data \
        quay.io/coreos/coreos-installer:release download -s stable -p metal -f iso
    ```
 
-   **Note:** This uses `coreos-installer` as a tool to download the ISO. The live ISO can boot in either legacy BIOS or UEFI mode.
+3. **Write the ISO to removable media**:
+   - Linux/macOS: `sudo dd if=fedora-coreos.iso of=/dev/sdX bs=4M status=progress oflag=sync`
+   - Windows: flash with [Rufus](https://rufus.ie/) using “DD Image” mode
 
-3. **Burn the ISO to disk**:
-   - **Linux/macOS**: Use `dd`
-   - **Windows**: Use [Rufus](https://rufus.ie/) in "DD Image" mode
+4. **Boot the target machine** from the live ISO and open a shell prompt.
 
-4. **Boot from the ISO** on your target system:
-
-   The ISO brings up a fully functional FCOS system from memory without using disk storage. Once booted, you'll have access to a bash command prompt.
-
-5. **Install to disk with your Ignition file**:
+5. **Install to disk using your Ignition file** (mounted from USB, fetched via network, or copied into `/root`):
    ```bash
-   sudo coreos-installer install /dev/sda \
-       --ignition-file /path/to/config.ign
+   sudo coreos-installer install /dev/sda --ignition-file /path/to/config.ign
    ```
+   Swap `/dev/sda` for the actual target device (e.g. `/dev/nvme0n1`).
+   Use `--ignition-url` if your config is hosted remotely.
 
-   Replace `/dev/sda` with your target drive (e.g. `/dev/nvme0n1`).
-
-   Check `coreos-installer install --help` for additional options.
-
-6. **Reboot the system**:
+6. **Reboot** once the installer reports success:
    ```bash
    sudo reboot
    ```
 
-7. **First boot process**:
-   - Ignition ingests the configuration file and provisions the system
-   - The system applies your Ignition configuration (user, SSH keys, etc.)
-   - The automatic rebase services activate and reboot the system **twice**:
-     - First reboot: transitions to the **unsigned** OCI image
-     - Second reboot: transitions to the **signed** OCI image
-   - After both reboots, the system will be running your final, signed `homelab-coreos-minipc` image
+7. **Let the first boot complete**. Ignition provisions the host, then the autorebase services trigger the two expected reboots described above. After the second restart you land on the signed `homelab-coreos-minipc` image.
 
 ---
 
