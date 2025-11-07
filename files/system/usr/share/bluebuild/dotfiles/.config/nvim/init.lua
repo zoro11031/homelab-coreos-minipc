@@ -41,7 +41,6 @@ MiniDeps.setup({ path = { package = vim.fn.stdpath("data") .. "/site/pack/deps" 
 local add = MiniDeps.add
 add("echasnovski/mini.nvim")
 add("lewis6991/gitsigns.nvim")
-add("neovim/nvim-lspconfig")
 
 -- Mini modules
 require("mini.pairs").setup()
@@ -54,7 +53,6 @@ require("mini.pick").setup()
 require("gitsigns").setup()
 
 -- LSP
-local lspconfig = require("lspconfig")
 local capabilities = vim.lsp.protocol.make_client_capabilities()
 
 local function on_attach(client, bufnr)
@@ -70,6 +68,9 @@ local function on_attach(client, bufnr)
   map("n", "]d", vim.diagnostic.goto_next, "LSP: Next diagnostic")
   map("n", "<leader>cd", vim.diagnostic.open_float, "LSP: Line diagnostics")
 end
+
+-- Configure LSP servers using vim.lsp.config (nvim 0.11+)
+local lspconfig = vim.lsp.config
 
 local servers = { "bashls", "pyright", "yamlls", "lua_ls" }
 for _, server in ipairs(servers) do
