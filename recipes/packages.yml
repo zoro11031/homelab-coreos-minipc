@@ -32,7 +32,6 @@ modules:
       - btop
       - make
       - unzip
-      - gcc
       - ripgrep
       - fd-find
 
