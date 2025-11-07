@@ -5,15 +5,6 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
-# Detect if we're in a dev container (Docker OR Podman)
-if [[ -f "/.dockerenv" ]] || \
-   [[ -n "$REMOTE_CONTAINERS" ]] || \
-   [[ -f "/run/.containerenv" ]]; then
-  INSIDE_CONTAINER=true
-else
-  INSIDE_CONTAINER=false
-fi
-
 if [[ -f "/opt/homebrew/bin/brew" ]]; then
   # If you're using macOS, you'll want this enabled
   eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -35,23 +26,23 @@ source "${ZINIT_HOME}/zinit.zsh"
 zinit ice depth=1; zinit light romkatv/powerlevel10k
 
 # Add in zsh plugins
-zinit light zsh-users/zsh-completions
-zinit light zsh-users/zsh-autosuggestions
-zinit light hlissner/zsh-autopair
-zinit light Aloxaf/fzf-tab
-zinit light zdharma-continuum/fast-syntax-highlighting
-zinit light zsh-users/zsh-history-substring-search
+zinit_plugins=(
+  zsh-users/zsh-completions
+  zsh-users/zsh-autosuggestions
+  zdharma-continuum/fast-syntax-highlighting
+  Aloxaf/fzf-tab
+)
+
+for plugin in "${zinit_plugins[@]}"; do
+  zinit light "$plugin"
+done
 
 
 # Add in snippets
+# Keep the baseline OMZ snippets here; add additional ones below when required.
 zinit snippet OMZL::git.zsh
 zinit snippet OMZP::git
 zinit snippet OMZP::sudo
-zinit snippet OMZP::archlinux
-zinit snippet OMZP::aws
-zinit snippet OMZP::kubectl
-zinit snippet OMZP::kubectx
-zinit snippet OMZP::command-not-found
 
 # Load completions
 autoload -Uz compinit && compinit
