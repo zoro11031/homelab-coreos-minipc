@@ -53,48 +53,41 @@ require("mini.pick").setup()
 -- Git signs
 require("gitsigns").setup()
 
--- LSP
-local lspconfig = require("lspconfig")
-local capabilities = vim.lsp.protocol.make_client_capabilities()
+-- LSP keymaps on attach
+vim.api.nvim_create_autocmd("LspAttach", {
+  callback = function(args)
+    local opts = { buffer = args.buf }
+    vim.keymap.set("n", "gd", vim.lsp.buf.definition, opts)
+    vim.keymap.set("n", "gr", vim.lsp.buf.references, opts)
+    vim.keymap.set("n", "K", vim.lsp.buf.hover, opts)
+    vim.keymap.set({ "n", "v" }, "<leader>cf", vim.lsp.buf.format, opts)
+    vim.keymap.set("n", "[d", vim.diagnostic.goto_prev, opts)
+    vim.keymap.set("n", "]d", vim.diagnostic.goto_next, opts)
+    vim.keymap.set("n", "<leader>cd", vim.diagnostic.open_float, opts)
+  end,
+})
 
-local function on_attach(client, bufnr)
-  local map = function(mode, lhs, rhs, desc)
-    vim.keymap.set(mode, lhs, rhs, { buffer = bufnr, desc = desc })
-  end
-
-  map("n", "gd", vim.lsp.buf.definition, "LSP: Go to definition")
-  map("n", "gr", vim.lsp.buf.references, "LSP: Go to references")
-  map("n", "K", vim.lsp.buf.hover, "LSP: Hover")
-  map({ "n", "v" }, "<leader>cf", vim.lsp.buf.format, "LSP: Format")
-  map("n", "[d", vim.diagnostic.goto_prev, "LSP: Previous diagnostic")
-  map("n", "]d", vim.diagnostic.goto_next, "LSP: Next diagnostic")
-  map("n", "<leader>cd", vim.diagnostic.open_float, "LSP: Line diagnostics")
-end
-
-local servers = { "bashls", "pyright", "yamlls", "lua_ls" }
-for _, server in ipairs(servers) do
-  local opts = { capabilities = capabilities, on_attach = on_attach }
-  if server == "lua_ls" then
-    opts.settings = {
+-- Configure LSP servers using vim.lsp.config (nvim 0.11+)
+-- Load lspconfig plugin first, then use the new vim.lsp.config API
+require('lspconfig')
+local lspconfig = vim.lsp.config
+for _, server in ipairs({ "bashls", "pyright", "yamlls", "lua_ls" }) do
+  lspconfig[server].setup(server == "lua_ls" and {
+    settings = {
       Lua = {
         diagnostics = { globals = { "vim" } },
         workspace = { library = vim.api.nvim_get_runtime_file("", true) },
       },
-    }
-  end
-  lspconfig[server].setup(opts)
+    },
+  } or {})
 end
 
 -- Keymaps
-local function map(mode, lhs, rhs, desc)
-  vim.keymap.set(mode, lhs, rhs, { desc = desc })
-end
-
 local pick = require("mini.pick")
-map("n", "<leader>ff", pick.builtin.files, "Find files")
-map("n", "<leader>fg", pick.builtin.grep_live, "Live grep")
-map("n", "<leader>fb", pick.builtin.buffers, "List buffers")
-map("n", "<leader>e", require("mini.files").open, "Toggle file explorer")
-map("n", "<leader>qq", vim.cmd.quit, "Quit")
-map("n", "<leader>ww", vim.cmd.write, "Write file")
+vim.keymap.set("n", "<leader>ff", pick.builtin.files)
+vim.keymap.set("n", "<leader>fg", pick.builtin.grep_live)
+vim.keymap.set("n", "<leader>fb", pick.builtin.buffers)
+vim.keymap.set("n", "<leader>e", require("mini.files").open)
+vim.keymap.set("n", "<leader>qq", vim.cmd.quit)
+vim.keymap.set("n", "<leader>ww", vim.cmd.write)
 
