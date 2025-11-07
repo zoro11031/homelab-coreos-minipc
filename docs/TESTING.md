@@ -10,7 +10,11 @@ This guide describes how to validate the `homelab-coreos-minipc` uCore image end
    - Enough CPU (4 vCPU), RAM (12–16 GiB), and disk (80 GiB) to mirror the NAB9 mini PC footprint.
 2. **Download the image under test**
    - Pull the latest build from GitHub Container Registry: `podman pull ghcr.io/<user>/homelab-coreos-minipc:latest`.
-   - Use `podman image save --format oci-archive` or `skopeo` to export the root filesystem for CoreOS live ISO use, then write it to a qcow2 disk for testing.
+   - Export the container image as an OCI archive, unpack it, and convert it to a qcow2 disk in sequence:
+     1. `podman image save --format oci-archive ghcr.io/<user>/homelab-coreos-minipc:latest -o homelab-coreos-minipc-x86_64.oci`.
+     2. `mkdir -p /tmp/homelab-coreos-minipc && tar -xvf homelab-coreos-minipc-x86_64.oci -C /tmp/homelab-coreos-minipc` so the raw disk (`*.raw` or `disk`) from the archive is on disk.
+     3. Run `coreos-installer install --architecture=x86_64 --image-file $(find /tmp/homelab-coreos-minipc -name '*.raw' -o -name 'disk' -print -quit) --ignition-file ignition/minipc.ign --copy-network --dest-device homelab-coreos-minipc-x86_64.qcow2` to embed ignition and produce the bootable qcow2; alternatively, stream the raw image into `virt-install --import` with the same ignition flags if you prefer a single pipeline.
+   - Confirm the resulting qcow2 filename includes the architecture suffix (e.g., `homelab-coreos-minipc-x86_64.qcow2`) before attaching it in virt-manager so you catch any accidental ARM builds.
 3. **Provision an ignition file**
    - Start with `ignition/minipc.ign` (or the generated output) and adjust credentials as needed for the lab VM.
    - Keep the default `core` user so that systemd setup scripts seeded by the build can run. They stage dotfiles, Compose bundles, and WireGuard helpers under `/home/core/setup` via the `home-directory-setup.service` unit.【F:files/system/etc/systemd/system/home-directory-setup.service†L1-L15】【F:files/system/usr/share/setup-scripts/compose.sh†L1-L5】
