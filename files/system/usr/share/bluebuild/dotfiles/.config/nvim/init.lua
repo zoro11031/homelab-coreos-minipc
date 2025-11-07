@@ -71,14 +71,16 @@ vim.api.nvim_create_autocmd("LspAttach", {
 -- Load lspconfig plugin first, then use the new vim.lsp.config API
 local lspconfig = vim.lsp.config
 for _, server in ipairs({ "bashls", "pyright", "yamlls", "lua_ls" }) do
-  lspconfig[server].setup(server == "lua_ls" and {
-    settings = {
+  local opts = {}
+  if server == "lua_ls" then
+    opts.settings = {
       Lua = {
         diagnostics = { globals = { "vim" } },
         workspace = { library = vim.api.nvim_get_runtime_file("", true) },
       },
-    },
-  } or {})
+    }
+  end
+  lspconfig[server].setup(opts)
 end
 
 -- Keymaps
