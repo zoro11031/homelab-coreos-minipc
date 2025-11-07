@@ -105,33 +105,26 @@ require("lazy").setup({
       -- LSP setup using new API
       local capabilities = require("cmp_nvim_lsp").default_capabilities()
       local lspconfig = require("lspconfig")
+      local util = require("lspconfig.util")
 
       -- Python
       lspconfig.pyright.setup({
-        cmd = { "pyright-langserver", "--stdio" },
-        filetypes = { "python" },
-        root_markers = { "pyproject.toml", "setup.py", "requirements.txt", ".git" },
         capabilities = capabilities,
+        root_dir = util.root_pattern("pyproject.toml", "setup.py", "requirements.txt", ".git"),
       })
 
       -- Bash
       lspconfig.bashls.setup({
-        cmd = { "bash-language-server", "start" },
-        filetypes = { "sh", "bash" },
         capabilities = capabilities,
       })
 
       -- YAML
       lspconfig.yamlls.setup({
-        cmd = { "yaml-language-server", "--stdio" },
-        filetypes = { "yaml", "yml" },
         capabilities = capabilities,
       })
 
       -- Lua
       lspconfig.lua_ls.setup({
-        cmd = { "lua-language-server" },
-        filetypes = { "lua" },
         capabilities = capabilities,
         settings = {
           Lua = {
