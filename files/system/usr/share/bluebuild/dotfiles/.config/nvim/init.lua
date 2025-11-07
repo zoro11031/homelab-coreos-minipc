@@ -24,14 +24,14 @@ vim.opt.expandtab = true
 vim.opt.termguicolors = true
 
 -- Plugins
-require("lazy").setup({
+local plugins = {
   -- Color scheme
   {
     "folke/tokyonight.nvim",
     lazy = false,
     priority = 1000,
     config = function()
-      vim.cmd([[colorscheme tokyonight-night]])
+      vim.cmd.colorscheme("tokyonight-night")
     end,
   },
 
@@ -54,7 +54,6 @@ require("lazy").setup({
     dependencies = { "nvim-tree/nvim-web-devicons" },
     config = function()
       require("nvim-tree").setup()
-      vim.keymap.set("n", "<leader>e", ":NvimTreeToggle<CR>")
     end,
   },
 
@@ -62,14 +61,9 @@ require("lazy").setup({
   {
     "nvim-telescope/telescope.nvim",
     dependencies = { "nvim-lua/plenary.nvim" },
-    config = function()
-      vim.keymap.set("n", "<leader>ff", "<cmd>Telescope find_files<cr>")
-      vim.keymap.set("n", "<leader>fg", "<cmd>Telescope live_grep<cr>")
-      vim.keymap.set("n", "<leader>fb", "<cmd>Telescope buffers<cr>")
-    end,
   },
 
- -- LSP and autocomplete
+  -- LSP and autocomplete
   {
     "neovim/nvim-lspconfig",
     dependencies = {
@@ -82,6 +76,7 @@ require("lazy").setup({
     },
     config = function()
       local cmp = require("cmp")
+
       cmp.setup({
         snippet = {
           expand = function(args)
@@ -102,44 +97,33 @@ require("lazy").setup({
         },
       })
 
-      -- LSP setup using new API
       local capabilities = require("cmp_nvim_lsp").default_capabilities()
       local lspconfig = require("lspconfig")
       local util = require("lspconfig.util")
 
-      -- Python
-      lspconfig.pyright.setup({
-        capabilities = capabilities,
-        root_dir = util.root_pattern("pyproject.toml", "setup.py", "requirements.txt", ".git"),
-      })
-
-      -- Bash
-      lspconfig.bashls.setup({
-        capabilities = capabilities,
-      })
-
-      -- YAML
-      lspconfig.yamlls.setup({
-        capabilities = capabilities,
-      })
-
-      -- Lua
-      lspconfig.lua_ls.setup({
-        capabilities = capabilities,
-        settings = {
-          Lua = {
-            diagnostics = { globals = { "vim" } },
+      local server_overrides = {
+        pyright = {
+          root_dir = util.root_pattern("pyproject.toml", "setup.py", "requirements.txt", ".git"),
+        },
+        lua_ls = {
+          settings = {
+            Lua = {
+              diagnostics = { globals = { "vim" } },
+            },
           },
         },
-      })
-    end,
-  },
+      }
 
- -- Auto pairs
-  {
-    "windwp/nvim-autopairs",
-    event = "InsertEnter",
-    config = true,
+      local servers = { "bashls", "pyright", "yamlls", "lua_ls" }
+      for _, server in ipairs(servers) do
+        local opts = vim.tbl_deep_extend(
+          "force",
+          { capabilities = capabilities },
+          server_overrides[server] or {}
+        )
+        lspconfig[server].setup(opts)
+      end
+    end,
   },
 
   -- Git signs
@@ -148,18 +132,29 @@ require("lazy").setup({
     config = true,
   },
 
-  -- Status line
+  -- Mini modules (pairs, comment, statusline)
   {
-    "nvim-lualine/lualine.nvim",
-    dependencies = { "nvim-tree/nvim-web-devicons" },
+    "echasnovski/mini.nvim",
     config = function()
-      require("lualine").setup()
+      require("mini.pairs").setup()
+      require("mini.comment").setup()
+      require("mini.statusline").setup()
     end,
   },
+}
 
-  -- Comment plugin
-  {
-    "numToStr/Comment.nvim",
-    config = true,
-  },
-})
+require("lazy").setup(plugins)
+
+-- Keymaps
+local function map(mode, lhs, rhs, desc)
+  vim.keymap.set(mode, lhs, rhs, { desc = desc })
+end
+
+local function nmap(lhs, rhs, desc)
+  map("n", lhs, rhs, desc)
+end
+
+nmap("<leader>ff", "<cmd>Telescope find_files<cr>", "Find files")
+nmap("<leader>fg", "<cmd>Telescope live_grep<cr>", "Live grep")
+nmap("<leader>fb", "<cmd>Telescope buffers<cr>", "List buffers")
+nmap("<leader>e", "<cmd>NvimTreeToggle<cr>", "Toggle file tree")
