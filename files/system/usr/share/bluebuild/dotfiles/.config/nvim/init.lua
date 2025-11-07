@@ -84,10 +84,10 @@ end
 
 -- Keymaps
 local pick = require("mini.pick")
-vim.keymap.set("n", "<leader>ff", pick.builtin.files)
-vim.keymap.set("n", "<leader>fg", pick.builtin.grep_live)
-vim.keymap.set("n", "<leader>fb", pick.builtin.buffers)
-vim.keymap.set("n", "<leader>e", require("mini.files").open)
-vim.keymap.set("n", "<leader>qq", vim.cmd.quit)
-vim.keymap.set("n", "<leader>ww", vim.cmd.write)
+vim.keymap.set("n", "<leader>ff", pick.builtin.files, { desc = "Find files" })
+vim.keymap.set("n", "<leader>fg", pick.builtin.grep_live, { desc = "Live grep" })
+vim.keymap.set("n", "<leader>fb", pick.builtin.buffers, { desc = "List buffers" })
+vim.keymap.set("n", "<leader>e", require("mini.files").open, { desc = "Toggle file explorer" })
+vim.keymap.set("n", "<leader>qq", vim.cmd.quit, { desc = "Quit" })
+vim.keymap.set("n", "<leader>ww", vim.cmd.write, { desc = "Write file" })
 
