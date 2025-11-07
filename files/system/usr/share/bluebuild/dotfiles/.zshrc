@@ -33,6 +33,10 @@ fi
 # Source/Load zinit
 source "${ZINIT_HOME}/zinit.zsh"
 
+# Create completions directory if it doesn't exist
+# This prevents symlink errors when zinit installs completion files
+mkdir -p "${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/completions"
+
 # Add in Powerlevel10k
 zinit ice depth=1; zinit light romkatv/powerlevel10k
 
@@ -43,15 +47,12 @@ if command -v fzf >/dev/null && infocmp "$TERM" >/dev/null 2>&1; then
 fi
 
 # Add in zsh plugins
+# NOTE: fzf-tab is NOT loaded here - it must be loaded AFTER compinit
 zinit_plugins=(
   zsh-users/zsh-completions
   zsh-users/zsh-autosuggestions
   zdharma-continuum/fast-syntax-highlighting
 )
-
-if (( fzf_ready )); then
-  zinit_plugins+=(Aloxaf/fzf-tab)
-fi
 
 for plugin in "${zinit_plugins[@]}"; do
   zinit light "$plugin"
@@ -64,14 +65,39 @@ zinit snippet OMZL::git.zsh
 zinit snippet OMZP::git
 zinit snippet OMZP::sudo
 
-# Load completions
+# ============================================================================
+# Completion System Setup
+# ============================================================================
+
+# Set completion styles BEFORE initializing the completion system
+# Case-insensitive completion matching
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+# Use LS_COLORS for file completion coloring
+zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
+# Disable default menu - fzf-tab will provide a better UI
+zstyle ':completion:*' menu no
+
+# fzf-tab specific previews (only used if fzf-tab is loaded)
+zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
+zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
+
+# Initialize the completion system
 autoload -Uz compinit && compinit
 
+# Load fzf-tab AFTER compinit
+# fzf-tab wraps the completion system, so it must be loaded after compinit initializes it
+if (( fzf_ready )); then
+  zinit light Aloxaf/fzf-tab
+fi
+
+# Replay compdefs for any plugins that were loaded before compinit
+zinit cdreplay -q
+
+# Explicitly bind Tab to completion if fzf-tab is NOT loaded
+# When fzf-tab is loaded, it handles the Tab binding itself
 if (( ! fzf_ready )); then
   bindkey '^I' expand-or-complete
 fi
-
-zinit cdreplay -q
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -108,13 +134,6 @@ setopt hist_ignore_all_dups
 setopt hist_save_no_dups
 setopt hist_ignore_dups
 setopt hist_find_no_dups
-
-# Completion styling
-zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
-zstyle ':completion:*' list-colors "${(s.:.)LS_COLORS}"
-zstyle ':completion:*' menu no
-zstyle ':fzf-tab:complete:cd:*' fzf-preview 'ls --color $realpath'
-zstyle ':fzf-tab:complete:__zoxide_z:*' fzf-preview 'ls --color $realpath'
 
 # Dotfiles location
 export DOTFILES="${DOTFILES:-$HOME/.dotfiles}"
