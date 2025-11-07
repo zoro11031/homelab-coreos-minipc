@@ -111,8 +111,13 @@ alias c='clear'
 alias restow='(cd "$DOTFILES" && ./install.sh -r)'
 
 # Shell integrations
-eval "$(fzf --zsh)"
-eval "$(zoxide init --cmd cd zsh)"
+if command -v fzf >/dev/null; then
+  eval "$(fzf --zsh)"
+fi
+
+if command -v zoxide >/dev/null; then
+  eval "$(zoxide init --cmd cd zsh)"
+fi
 
 alias please='sudo $(fc -ln -1)'
 alias zshrc='${=EDITOR} ${ZDOTDIR:-$HOME}/.zshrc'
