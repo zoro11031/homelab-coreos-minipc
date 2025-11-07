@@ -41,7 +41,6 @@ MiniDeps.setup({ path = { package = vim.fn.stdpath("data") .. "/site/pack/deps" 
 local add = MiniDeps.add
 add("echasnovski/mini.nvim")
 add("lewis6991/gitsigns.nvim")
-add("neovim/nvim-lspconfig")
 
 -- Mini modules
 require("mini.pairs").setup()
