@@ -1,6 +1,6 @@
 # Setup Guide
 
-This guide provides detailed instructions for setting up the homelab CoreOS mini PC after the initial installation.
+Quick guide for setting up your homelab CoreOS mini PC. This is my personal setup - your mileage may vary!
 
 ## Table of Contents
 
@@ -22,17 +22,19 @@ This guide provides detailed instructions for setting up the homelab CoreOS mini
 
 ## Prerequisites
 
-- System successfully installed with Ignition configuration (see main README)
-- SSH access to the system as the `core` user
-- Network connectivity to your file server (if using NFS)
-- Your WireGuard endpoint details (if setting up VPN)
-- Required packages layered into image: `podman` or `docker`, `nfs-utils`, `wireguard-tools`
+Before you start, make sure you've got:
+
+- System installed with the Ignition config (check the main README if you haven't done this yet)
+- SSH access as the `core` user
+- Network connection to your file server (if you're using NFS)
+- WireGuard endpoint details (if you want VPN)
+- These packages in your image: `podman` or `docker`, `nfs-utils`, `wireguard-tools`
 
 ---
 
 ## Automated Setup (Recommended)
 
-The `homelab-setup-scripts` provide an interactive, automated way to configure your entire homelab environment. This is the **recommended approach** for most users.
+I made some interactive bash scripts to automate the whole setup process. Way easier than doing it manually!
 
 ### Quick Start
 
@@ -178,9 +180,9 @@ After automated setup completes:
 
 ## Manual Setup
 
-If you prefer manual configuration or need to customize beyond what the automated scripts provide, follow these detailed steps.
+Want to do things by hand? Here's the step-by-step breakdown if you need more control or just want to understand what's happening under the hood.
 
-> **Note:** The automated setup scripts (above) handle all of these steps for you. Manual setup is only needed for advanced customization or troubleshooting.
+> **Note:** The automated scripts (above) do all this for you. Only go manual if you need custom tweaks or are troubleshooting something specific.
 
 ---
 
@@ -231,9 +233,9 @@ sudo su - USERNAME
 
 ## 2. Directory Structure
 
-Set up a consistent directory structure for your container configurations and application data.
+Let's create a clean directory layout for all your container configs and app data.
 
-> **Automated Setup:** The setup scripts automatically create `/srv/containers/{media,web,cloud}/` for compose files and `/var/lib/containers/appdata/` for persistent data, with proper ownership for your configured user.
+> **Automated Setup:** The scripts handle this automatically - creates `/srv/containers/{media,web,cloud}/` for compose files and `/var/lib/containers/appdata/` for persistent data, all owned by your container user.
 
 ### Create Compose Directory Structure
 
@@ -295,6 +297,8 @@ mkdir -p ~/appdata/{plex,jellyfin,overseerr,wizarr,nextcloud,immich,postgres,red
 
 ### Alternative: Consolidated Structure
 
+If you prefer everything in one big compose file instead of splitting by category:
+
 ```
 /srv/containers/
 ├── compose.yml             # All services in one file
@@ -308,7 +312,11 @@ mkdir -p ~/appdata/{plex,jellyfin,overseerr,wizarr,nextcloud,immich,postgres,red
 
 ## 3. WireGuard Configuration
 
-WireGuard provides secure VPN connectivity for remote access and VPS tunneling.
+Time to set up WireGuard VPN for secure remote access and VPS tunneling. Super useful for accessing your homelab from anywhere!
+
+### Configuration Files Location
+
+Your WireGuard config lives at `/etc/wireguard/wg0.conf`. I've included templates and helper scripts in the setup directory to make this easier.
 
 ### Generate WireGuard Keys and Configuration
 
@@ -390,11 +398,27 @@ sudo wg show
   - iPhone: `10.253.0.9/32`
   - Framework Laptop Justin: `10.253.0.11/32`
 
+### Manual Configuration (Without Scripts)
+
+Want to do it all by hand? Here's the manual way:
+
+```bash
+# Generate server keys
+wg genkey | sudo tee /etc/wireguard/server_private.key
+sudo cat /etc/wireguard/server_private.key | wg pubkey | sudo tee /etc/wireguard/server_public.key
+
+# Generate peer keys (repeat for each peer)
+wg genkey | tee peer_private.key | wg pubkey > peer_public.key
+
+# Create /etc/wireguard/wg0.conf manually using the template as reference
+sudo nano /etc/wireguard/wg0.conf
+```
+
 ---
 
 ## 4. NFS Mounts Setup
 
-NFS mounts provide access to media and data stored on your file server.
+Now we'll mount your NFS shares so containers can access media and data from your file server.
 
 ### Create Mount Points
 
@@ -412,7 +436,7 @@ The image includes systemd mount units in `/etc/systemd/system/`. You may need t
 
 #### Update Mount Units
 
-If your NFS server IP differs from `192.168.7.10`, update the mount files:
+If your NFS server isn't at `192.168.7.10`, you'll need to update the mount files:
 
 ```bash
 # Find all mount units
@@ -467,7 +491,7 @@ mount | grep nfs
 
 ### Alternative: Using /etc/fstab
 
-If you prefer traditional fstab entries instead of systemd mount units:
+Prefer the old-school fstab approach? Here you go:
 
 ```bash
 # Edit fstab
@@ -482,7 +506,7 @@ sudo nano /etc/fstab
 sudo mount -a
 ```
 
-**Note**: The `_netdev` option is crucial - it tells systemd to wait for the network before trying to mount.
+**Pro tip**: That `_netdev` option is important - it tells systemd to wait for the network before trying to mount. Without it, your system will try to mount before the network is up and fail.
 
 ### NFS Mount Options Explained
 
@@ -500,6 +524,8 @@ sudo mount -a
 
 ## 5. Container Setup
 
+Time to decide: Podman or Docker? Both work great, but Podman's my recommendation for uCore systems.
+
 ### Setup Templates
 
 Compose templates and a `.env.example` are provided in `~/setup/compose-setup/`. Copy these to `/srv/containers/` as your starting point:
@@ -513,7 +539,7 @@ cd /srv/containers
 
 ---
 
-> **Automated Setup:** The setup scripts automatically detect available runtimes and let you choose. They configure services to use the correct compose command (podman-compose, docker-compose, or plugin variants) and handle all environment variable setup.
+> **Automated Setup:** The scripts detect what you've got installed and let you pick. They figure out the right compose command to use and set up all the environment variables for you.
 
 ### Choosing a Container Runtime
 
@@ -818,6 +844,8 @@ curl http://localhost:2283  # Immich
 
 ## Troubleshooting
 
+Things not working? Here's how to debug common issues. Also check out the troubleshooting script: `./scripts/troubleshoot.sh`
+
 ### NFS Mounts Not Working
 
 ```bash
@@ -896,13 +924,13 @@ sudo ostree admin pin 0  # Pin index 0
 
 ## Next Steps
 
-After completing this setup:
+Alright, services are running! Here's what to do next:
 
-1. Configure each service through its web interface
-2. Set up reverse proxy (Nginx Proxy Manager) on VPS if using WireGuard tunnel
-3. Configure SSL certificates
-4. Set up backups for appdata
-5. Implement monitoring (optional)
-6. Configure Fail2ban for additional security
+1. **Configure each service** - Hit up those web interfaces and get everything set up
+2. **Reverse proxy** - If you're using the WireGuard tunnel to a VPS, set up Nginx Proxy Manager
+3. **SSL certificates** - Get those HTTPS green locks (Let's Encrypt is your friend)
+4. **Backups** - Seriously, back up your appdata. Future you will thank present you.
+5. **Monitoring** - Optional but nice to have (Grafana/Prometheus if you're into that)
+6. **Fail2ban** - Extra security never hurts
 
-For more information, see the main [README](../README.md).
+Check out the main [README](../README.md) for more detailed info on each of these.
