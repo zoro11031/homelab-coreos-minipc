@@ -8,3 +8,18 @@ system:
     - mnt-nas-nextcloud.mount
     - mnt-nas-immich.mount
     - home-directory-setup.service
+  # Note: The following compose services are installed but NOT auto-enabled.
+  # They must be manually enabled during setup using:
+  #
+  # For Podman:
+  # sudo systemctl enable --now podman-compose-media.service
+  # sudo systemctl enable --now podman-compose-web.service
+  # sudo systemctl enable --now podman-compose-cloud.service
+  #
+  # For Docker:
+  # sudo systemctl enable --now docker-compose-media.service
+  # sudo systemctl enable --now docker-compose-web.service
+  # sudo systemctl enable --now docker-compose-cloud.service
+  #
+  # These services run as dockeruser and manage the compose stacks in /home/dockeruser/compose/
+  # Choose either Podman or Docker services based on your container runtime preference.

@@ -1,0 +1,16 @@
+[Unit]
+Description=Podman Compose - Media Stack
+After=network-online.target mnt-nas-media.mount
+Requires=mnt-nas-media.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=dockeruser
+Group=dockeruser
+WorkingDirectory=/home/dockeruser/compose/media
+ExecStart=/usr/bin/podman-compose up -d
+ExecStop=/usr/bin/podman-compose down
+
+[Install]
+WantedBy=multi-user.target
