@@ -9,8 +9,8 @@ RemainAfterExit=yes
 User=dockeruser
 Group=dockeruser
 WorkingDirectory=/srv/containers
-ExecStart=/usr/local/bin/podman-compose -f media.yml up -d
-ExecStop=/usr/local/bin/podman-compose -f media.yml down
+ExecStart=/usr/bin/podman-compose -f media.yml up -d
+ExecStop=/usr/bin/podman-compose -f media.yml down
 TimeoutStartSec=0
 
 [Install]
