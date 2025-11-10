@@ -76,11 +76,13 @@ The automated setup configures:
    - Auto-detects available runtimes
    - Uses correct compose commands automatically
 
-2. **User Account**
-   - Use current user (`core`) or create custom dedicated user
+2. **User Account** (Security Best Practice)
+   - Creates dedicated user for container management (recommended)
    - Automatically configures groups and permissions
    - Sets up subuid/subgid for rootless containers
-   - Detects UID/GID and timezone automatically
+   - Detects UID/GID from the dedicated user (not admin user)
+   - All container files owned by this user for security isolation
+   - You continue using admin user (`core`) to run scripts
 
 3. **Directory Structure**
    - `/srv/containers/{media,web,cloud}/` for compose files
@@ -125,12 +127,17 @@ Select container runtime [1]:
 
 **User Configuration:**
 ```
-Options:
-  1. Use current user (core)
-  2. Create a new dedicated user
+SECURITY BEST PRACTICE:
+Create a dedicated user for container management separate from your admin user.
+This user will own all container files but you won't log in as this user.
+You'll continue using 'core' to run these scripts and manage the system.
 
-Choose option [1]: 2
-Enter new username [containeruser]: myhomelabuser
+Options:
+  1. Create a new dedicated user (RECOMMENDED)
+  2. Use current user (core) - not recommended for production
+
+Choose option [1]: 1
+Enter new username for container management [containeruser]: myhomelabuser
 ```
 
 **NFS Server:**
