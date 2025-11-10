@@ -292,6 +292,18 @@ verify_user_setup() {
 # ============================================================================
 
 interactive_user_setup() {
+    # First, select container runtime
+    if ! config_exists "CONTAINER_RUNTIME"; then
+        select_container_runtime || {
+            log_error "Container runtime selection failed"
+            return 1
+        }
+    else
+        local runtime
+        runtime=$(load_config "CONTAINER_RUNTIME")
+        log_info "Using configured container runtime: $runtime"
+    fi
+
     log_step "User Configuration"
 
     local target_user=""
@@ -304,8 +316,7 @@ interactive_user_setup() {
     echo ""
     log_info "Options:"
     log_info "  1. Use current user ($current_user)"
-    log_info "  2. Create dedicated 'dockeruser' account"
-    log_info "  3. Specify a different username"
+    log_info "  2. Create a new dedicated user"
     echo ""
 
     while [[ -z "$target_user" ]]; do
@@ -318,36 +329,28 @@ interactive_user_setup() {
                 log_success "Using current user: $target_user"
                 ;;
             2)
-                target_user="$DOCKER_USER"
-                if check_user_exists "$target_user"; then
-                    log_info "User $target_user already exists"
-                else
-                    if ! create_docker_user "$target_user"; then
-                        log_error "Failed to create user $target_user"
-                        target_user=""
-                        continue
-                    fi
-                fi
-                ;;
-            3)
-                target_user=$(prompt_input "Enter username")
-                if check_user_exists "$target_user"; then
-                    log_info "User $target_user already exists"
-                else
-                    if prompt_yes_no "Create user $target_user?" "yes"; then
-                        if ! create_docker_user "$target_user"; then
-                            log_error "Failed to create user $target_user"
-                            target_user=""
-                            continue
-                        fi
+                # Ask for username
+                local new_username
+                new_username=$(prompt_input "Enter new username" "containeruser")
+
+                if check_user_exists "$new_username"; then
+                    log_warning "User $new_username already exists"
+                    if prompt_yes_no "Use existing user $new_username?" "yes"; then
+                        target_user="$new_username"
                     else
-                        target_user=""
+                        log_info "Please choose a different username"
                         continue
                     fi
+                else
+                    if ! create_docker_user "$new_username"; then
+                        log_error "Failed to create user $new_username"
+                        continue
+                    fi
+                    target_user="$new_username"
                 fi
                 ;;
             *)
-                log_error "Invalid choice"
+                log_error "Invalid choice. Please enter 1 or 2."
                 ;;
         esac
     done
@@ -385,13 +388,18 @@ show_configuration_summary() {
     print_separator
 
     # Load and display saved configuration
-    local setup_user puid pgid tz user_home
+    local setup_user puid pgid tz user_home container_runtime
 
     setup_user=$(load_config "SETUP_USER" "")
     puid=$(load_config "PUID" "")
     pgid=$(load_config "PGID" "")
     tz=$(load_config "TZ" "")
     user_home=$(load_config "USER_HOME" "")
+    container_runtime=$(load_config "CONTAINER_RUNTIME" "")
+
+    if [[ -n "$container_runtime" ]]; then
+        echo "CONTAINER_RUNTIME=$container_runtime"
+    fi
 
     if [[ -n "$setup_user" ]]; then
         echo "SETUP_USER=$setup_user"

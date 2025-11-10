@@ -244,6 +244,110 @@ check_command() {
     fi
 }
 
+# ============================================================================
+# Container Runtime Functions
+# ============================================================================
+
+detect_container_runtime() {
+    # Check what's available and configured
+    local runtime=$(load_config "CONTAINER_RUNTIME" "")
+
+    if [[ -n "$runtime" ]]; then
+        echo "$runtime"
+        return 0
+    fi
+
+    # Auto-detect based on what's available
+    if check_command podman; then
+        echo "podman"
+    elif check_command docker; then
+        echo "docker"
+    else
+        return 1
+    fi
+}
+
+get_compose_command() {
+    local runtime=$(detect_container_runtime)
+
+    case $runtime in
+        podman)
+            if check_command podman-compose; then
+                echo "podman-compose"
+            else
+                echo "podman compose"
+            fi
+            ;;
+        docker)
+            if check_command docker-compose; then
+                echo "docker-compose"
+            else
+                echo "docker compose"
+            fi
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+select_container_runtime() {
+    log_step "Container Runtime Selection"
+
+    local available_runtimes=()
+
+    # Check what's available
+    if check_command podman; then
+        available_runtimes+=("podman")
+    fi
+
+    if check_command docker; then
+        available_runtimes+=("docker")
+    fi
+
+    if [[ ${#available_runtimes[@]} -eq 0 ]]; then
+        log_error "No container runtime found (podman or docker)"
+        return 1
+    fi
+
+    # If only one is available, use it
+    if [[ ${#available_runtimes[@]} -eq 1 ]]; then
+        local runtime="${available_runtimes[0]}"
+        log_success "Using ${runtime} (only runtime available)"
+        save_config "CONTAINER_RUNTIME" "$runtime"
+        return 0
+    fi
+
+    # Ask user to choose
+    echo ""
+    log_info "Multiple container runtimes detected:"
+    echo "  1. Podman (rootless, recommended for UBlue uCore)"
+    echo "  2. Docker"
+    echo ""
+
+    local choice
+    while true; do
+        read -r -p "Select container runtime [1]: " choice
+        choice=${choice:-1}
+
+        case $choice in
+            1|podman|Podman)
+                save_config "CONTAINER_RUNTIME" "podman"
+                log_success "Using Podman"
+                return 0
+                ;;
+            2|docker|Docker)
+                save_config "CONTAINER_RUNTIME" "docker"
+                log_success "Using Docker"
+                return 0
+                ;;
+            *)
+                log_error "Invalid choice. Please enter 1 or 2."
+                ;;
+        esac
+    done
+}
+
 check_package() {
     local pkg="$1"
     if rpm -q "$pkg" &> /dev/null; then
@@ -523,6 +627,7 @@ export -f save_config load_config config_exists
 export -f prompt_yes_no prompt_input prompt_password
 export -f validate_ip validate_port validate_path
 export -f check_ucore check_command check_package check_systemd_service get_service_location
+export -f detect_container_runtime get_compose_command select_container_runtime
 export -f test_connectivity get_default_interface get_interface_ip
 export -f ensure_directory backup_file
 export -f handle_error require_root require_sudo

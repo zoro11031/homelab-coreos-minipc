@@ -72,6 +72,12 @@ create_podman_compose_service() {
 
     local unit_file="/etc/systemd/system/${service_name}"
 
+    # Get compose command based on container runtime
+    local compose_cmd
+    compose_cmd=$(get_compose_command)
+
+    log_info "Using compose command: $compose_cmd"
+
     # Create service unit
     sudo tee "$unit_file" > /dev/null <<EOF
 [Unit]
@@ -84,9 +90,9 @@ RequiresMountsFor=$service_dir
 Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=$service_dir
-ExecStartPre=/usr/bin/podman-compose pull
-ExecStart=/usr/bin/podman-compose up -d
-ExecStop=/usr/bin/podman-compose down
+ExecStartPre=$compose_cmd pull
+ExecStart=$compose_cmd up -d
+ExecStop=$compose_cmd down
 TimeoutStartSec=600
 
 [Install]
@@ -120,13 +126,17 @@ pull_container_images() {
 
     log_info "This may take several minutes depending on your internet connection..."
 
-    # Pull images using podman-compose
-    if (cd "$service_dir" && podman-compose pull 2>&1 | tee /tmp/podman-compose-pull.log); then
+    # Get compose command based on container runtime
+    local compose_cmd
+    compose_cmd=$(get_compose_command)
+
+    # Pull images using detected compose command
+    if (cd "$service_dir" && $compose_cmd pull 2>&1 | tee /tmp/compose-pull.log); then
         log_success "Images pulled successfully"
         return 0
     else
         log_error "Failed to pull images"
-        log_info "Check log: /tmp/podman-compose-pull.log"
+        log_info "Check log: /tmp/compose-pull.log"
         return 1
     fi
 }
@@ -250,13 +260,17 @@ verify_service_status() {
 list_running_containers() {
     log_step "Listing Running Containers"
 
-    if ! check_command podman; then
-        log_error "Podman not available"
+    # Get container runtime
+    local runtime
+    runtime=$(detect_container_runtime)
+
+    if ! check_command "$runtime"; then
+        log_error "Container runtime not available: $runtime"
         return 1
     fi
 
     local container_count
-    container_count=$(podman ps --format "{{.Names}}" 2>/dev/null | wc -l)
+    container_count=$($runtime ps --format "{{.Names}}" 2>/dev/null | wc -l)
 
     if [[ $container_count -eq 0 ]]; then
         log_warning "No containers are currently running"
@@ -266,7 +280,7 @@ list_running_containers() {
     log_success "Found $container_count running container(s):"
     echo ""
 
-    podman ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true
+    $runtime ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" 2>/dev/null || true
 
     echo ""
     return 0
@@ -274,6 +288,11 @@ list_running_containers() {
 
 check_container_health() {
     log_step "Checking Container Health"
+
+    # Get container runtime and compose command
+    local runtime compose_cmd
+    runtime=$(detect_container_runtime)
+    compose_cmd=$(get_compose_command)
 
     local all_healthy=true
 
@@ -290,11 +309,11 @@ check_container_health() {
             local service_dir="${CONTAINERS_BASE}/${service}"
             if [[ -d "$service_dir" ]]; then
                 local containers
-                containers=$(cd "$service_dir" && podman-compose ps --format "{{.Name}}" 2>/dev/null | grep -v "^$" || echo "")
+                containers=$(cd "$service_dir" && $compose_cmd ps --format "{{.Name}}" 2>/dev/null | grep -v "^$" || echo "")
 
                 if [[ -n "$containers" ]]; then
                     while IFS= read -r container; do
-                        if podman ps --filter "name=${container}" --format "{{.Names}}" 2>/dev/null | grep -q "$container"; then
+                        if $runtime ps --filter "name=${container}" --format "{{.Names}}" 2>/dev/null | grep -q "$container"; then
                             log_success "  ✓ $container is running"
                         else
                             log_error "  ✗ $container is not running"

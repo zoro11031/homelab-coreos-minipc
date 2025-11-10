@@ -26,12 +26,16 @@ source "${SCRIPT_DIR}/common-functions.sh"
 ERRORS=0
 WARNINGS=0
 
-# Required packages for homelab setup
-REQUIRED_PACKAGES=(
+# Core required packages for homelab setup
+CORE_PACKAGES=(
     "nfs-utils"
     "wireguard-tools"
-    "podman"
-    "podman-compose"
+)
+
+# Container runtime packages (at least one required)
+CONTAINER_PACKAGES=(
+    "podman:podman-compose"
+    "docker:docker-compose"
 )
 
 # Expected systemd services from BlueBuild image
@@ -96,7 +100,8 @@ check_required_packages() {
 
     local missing_packages=()
 
-    for package in "${REQUIRED_PACKAGES[@]}"; do
+    # Check core packages
+    for package in "${CORE_PACKAGES[@]}"; do
         if check_package "$package"; then
             log_success "$package is installed"
         else
@@ -105,6 +110,32 @@ check_required_packages() {
             ((ERRORS++))
         fi
     done
+
+    # Check container runtime packages (at least one set required)
+    local found_container_runtime=false
+    for runtime_set in "${CONTAINER_PACKAGES[@]}"; do
+        local runtime=$(echo "$runtime_set" | cut -d: -f1)
+        local compose=$(echo "$runtime_set" | cut -d: -f2)
+
+        if check_package "$runtime"; then
+            log_success "$runtime is installed"
+            found_container_runtime=true
+
+            if check_package "$compose" || check_command "$compose"; then
+                log_success "$compose is available"
+            else
+                log_warning "$compose is not installed (may be available via plugin)"
+            fi
+            break
+        fi
+    done
+
+    if ! $found_container_runtime; then
+        log_error "No container runtime found (podman or docker required)"
+        log_info "  For Podman: sudo rpm-ostree install podman podman-compose"
+        log_info "  For Docker: sudo rpm-ostree install docker docker-compose"
+        ((ERRORS++))
+    fi
 
     if [[ ${#missing_packages[@]} -gt 0 ]]; then
         echo ""
@@ -119,9 +150,10 @@ check_required_packages() {
 check_required_commands() {
     log_step "Checking Required Commands"
 
-    local commands=("podman" "podman-compose" "wg" "mount.nfs" "systemctl")
+    # Core commands
+    local core_commands=("wg" "mount.nfs" "systemctl")
 
-    for cmd in "${commands[@]}"; do
+    for cmd in "${core_commands[@]}"; do
         if check_command "$cmd"; then
             log_success "$cmd command available"
         else
@@ -129,6 +161,37 @@ check_required_commands() {
             ((ERRORS++))
         fi
     done
+
+    # Container runtime commands (at least one required)
+    local found_runtime_cmd=false
+    if check_command podman; then
+        log_success "podman command available"
+        found_runtime_cmd=true
+
+        if check_command podman-compose; then
+            log_success "podman-compose command available"
+        elif check_command "podman compose"; then
+            log_success "podman compose command available (via plugin)"
+        else
+            log_warning "podman-compose not found"
+        fi
+    elif check_command docker; then
+        log_success "docker command available"
+        found_runtime_cmd=true
+
+        if check_command docker-compose; then
+            log_success "docker-compose command available"
+        elif check_command "docker compose"; then
+            log_success "docker compose command available (via plugin)"
+        else
+            log_warning "docker-compose not found"
+        fi
+    fi
+
+    if ! $found_runtime_cmd; then
+        log_error "No container runtime command found"
+        ((ERRORS++))
+    fi
 }
 
 check_systemd_services() {
