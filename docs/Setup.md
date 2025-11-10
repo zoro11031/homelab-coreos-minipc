@@ -40,7 +40,7 @@ I made some interactive bash scripts to automate the whole setup process. Way ea
 
 ```bash
 # Navigate to the setup scripts directory
-cd ~/homelab-setup-scripts
+cd ~/setup/home-lab-setup-scripts
 
 # Run the main orchestrator
 ./homelab-setup.sh
@@ -174,7 +174,7 @@ After automated setup completes:
 
 1. Access your services at the displayed URLs
 2. Configure each service through its web interface
-3. Run troubleshooting if needed: `./scripts/troubleshoot.sh`
+3. Run troubleshooting if needed: `~/setup/home-lab-setup-scripts/scripts/troubleshoot.sh`
 
 ---
 
@@ -844,7 +844,7 @@ curl http://localhost:2283  # Immich
 
 ## Troubleshooting
 
-Things not working? Here's how to debug common issues. Also check out the troubleshooting script: `./scripts/troubleshoot.sh`
+Things not working? Here's how to debug common issues. Also check out the troubleshooting script: `~/setup/home-lab-setup-scripts/scripts/troubleshoot.sh`
 
 ### NFS Mounts Not Working
 

@@ -12,13 +12,15 @@ Get your homelab up and running in under 30 minutes!
 
 ## Installation
 
-### 1. Get the Scripts
+### 1. Access Setup Scripts
+
+After first boot, the scripts are automatically available at:
 
 ```bash
-cd ~
-# Extract or clone homelab-setup-scripts
-cd homelab-setup-scripts
+cd ~/setup/home-lab-setup-scripts
 ```
+
+**Note:** These scripts are baked into the custom CoreOS image and deployed automatically during first boot.
 
 ### 2. Run Setup
 
