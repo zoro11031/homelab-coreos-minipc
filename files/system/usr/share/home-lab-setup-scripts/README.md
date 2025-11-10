@@ -111,18 +111,21 @@ These should be layered into your BlueBuild image or installed via rpm-ostree:
 
 ## Quick Start
 
-### 1. Download Scripts
+### 1. Access Setup Scripts
+
+After first boot, the system automatically copies these scripts to your home directory:
 
 ```bash
-# Clone or extract the homelab-setup-scripts directory
-cd ~
-# Assuming scripts are in ~/homelab-setup-scripts
+# Scripts are located at ~/setup/home-lab-setup-scripts
+cd ~/setup/home-lab-setup-scripts
 ```
+
+**Note:** The scripts are baked into the BlueBuild custom image and automatically deployed to `~/setup/home-lab-setup-scripts/` by the `home-directory-setup.service` systemd unit during first boot.
 
 ### 2. Run Setup
 
 ```bash
-cd homelab-setup-scripts
+cd ~/setup/home-lab-setup-scripts
 ./homelab-setup.sh
 ```
 

@@ -3,6 +3,7 @@
 # Create setup directory for templates
 mkdir -p /home/core/setup
 cp -r /usr/share/compose-setup /home/core/setup
+cp -r /usr/share/home-lab-setup-scripts /home/core/setup
 chown -R core:core /home/core/setup
 
 # Create the production compose directory

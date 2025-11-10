@@ -152,6 +152,29 @@ sudo bluebuild generate-iso --iso-name homelab-coreos-minipc.iso \
 
 ## Post-Install Setup
 
+After first boot, the system automatically copies setup scripts to `~/setup/`:
+- `~/setup/home-lab-setup-scripts/` - Interactive homelab setup system
+- `~/setup/compose-setup/` - Docker compose templates
+- `~/setup/wireguard-setup/` - WireGuard configuration helpers
+
+### Automated Setup (Recommended)
+
+Run the interactive setup script:
+```bash
+cd ~/setup/home-lab-setup-scripts
+./homelab-setup.sh
+```
+
+This will guide you through:
+1. System preflight checks
+2. User and directory configuration
+3. WireGuard VPN setup
+4. NFS mount configuration
+5. Container service deployment
+
+### Manual Setup
+
+Alternatively, configure manually:
 1. Configure WireGuard peers and keys.
 2. Mount NFS shares for media and appdata.
 3. Place compose files under `/srv/containers/`.
