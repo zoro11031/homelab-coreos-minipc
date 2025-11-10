@@ -331,53 +331,27 @@ On boot:
 
 ## Setup
 
-### 1. Configure WireGuard
+For detailed setup instructions after installation, see the **[Setup Guide Wiki](../../wiki/Setup)**.
 
-Generate WireGuard keys and configuration:
+The wiki includes comprehensive instructions for:
 
-```bash
-cd config/wireguard
-./generate-keys.sh    # Generate all keys and create .env
-./apply-config.sh     # Generate wg0.conf from template
-./export-peer-configs.sh --endpoint your.public.host:51820 \
-    --allowed-ips 10.253.0.0/24 --dns 1.1.1.1
-```
+- **User Setup**: Creating a dedicated user for managing containers
+- **Directory Structure**: Organizing compose files and application data
+- **WireGuard Configuration**: Setting up VPN connectivity and peer configs
+- **NFS Mounts**: Configuring network storage mounts
+- **Container Deployment**: Using Podman Compose or Docker with systemd integration
 
-The `generate-keys.sh` script will:
-- Generate server private/public keys
-- Generate keys for all 4 peers (Desktop, VPS, iPhone, Laptop)
-- Create a `.env` file with all keys
-- Store individual key files in `keys/` directory
+### Quick Start
 
-The `apply-config.sh` script will:
-- Read keys from `.env`
-- Generate `wg0.conf` from the template
-- Output client configuration details
+After installation, the basic setup workflow is:
 
-The `export-peer-configs.sh` script will:
-- Read keys from the `keys/` directory
-- Generate import-ready client configs in `peer-configs/`
-- Validate that all required key files exist before writing anything
+1. Configure WireGuard keys and deploy the configuration
+2. Set up NFS mounts for media storage
+3. Create directory structure for compose files and appdata
+4. Deploy container services with Podman Compose or Docker
+5. Enable systemd services for auto-start on boot
 
-**Important**: Update the network interface in `wg0.conf.template` if your system doesn't use `eth0`. Common alternatives: `enp1s0`, `eno1`, etc.
-
-### 2. Configure Podman Compose
-
-```bash
-cp compose/.env.example compose/.env
-# Edit compose/.env with your service-specific configuration
-```
-
-### 3. Update NFS Mounts
-
-Update NFS mount IPs in `files/system/etc/systemd/system/*.mount` to match your file server.
-
-### 4. Deploy Services
-
-```bash
-cd compose
-podman compose -f media.yml -f web.yml -f cloud.yml up -d
-```
+See the [Setup Guide Wiki](../../wiki/Setup) for detailed step-by-step instructions.
 
 ## Network
 
