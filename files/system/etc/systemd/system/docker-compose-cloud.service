@@ -1,7 +1,7 @@
 [Unit]
 Description=Docker Compose - Cloud Stack
 After=docker.service mnt-nas-nextcloud.mount mnt-nas-immich.mount
-Requires=docker.service
+Requires=docker.service mnt-nas-nextcloud.mount mnt-nas-immich.mount
 
 [Service]
 Type=oneshot
