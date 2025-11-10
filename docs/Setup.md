@@ -63,69 +63,72 @@ Set up a consistent directory structure for your container configurations and ap
 ### Create Compose Directory Structure
 
 ```bash
-# Create main compose directory
-mkdir -p ~/compose
+# Create main compose directory (system-wide location)
+sudo mkdir -p /srv/containers
 
 # Create subdirectories for different service stacks
-mkdir -p ~/compose/media      # Media services (Plex, Jellyfin, etc.)
-mkdir -p ~/compose/web        # Web services (Overseerr, Wizarr)
-mkdir -p ~/compose/cloud      # Cloud services (Nextcloud, Immich)
+sudo mkdir -p /srv/containers/media      # Media services (Plex, Jellyfin, etc.)
+sudo mkdir -p /srv/containers/web        # Web services (Overseerr, Wizarr)
+sudo mkdir -p /srv/containers/cloud      # Cloud services (Nextcloud, Immich)
 
-# Alternative: Single directory approach
-# mkdir -p ~/compose/services
+# Set appropriate ownership (assuming dockeruser)
+sudo chown -R dockeruser:dockeruser /srv/containers
 ```
 
 ### Create Application Data Directory
 
 ```bash
 # Create appdata directory for persistent container data
-mkdir -p ~/appdata
+sudo mkdir -p /var/lib/containers/appdata
 
 # Create subdirectories for each service
-mkdir -p ~/appdata/plex
-mkdir -p ~/appdata/jellyfin
-mkdir -p ~/appdata/overseerr
-mkdir -p ~/appdata/wizarr
-mkdir -p ~/appdata/nextcloud
-mkdir -p ~/appdata/immich
-mkdir -p ~/appdata/postgres
-mkdir -p ~/appdata/redis
+sudo mkdir -p /var/lib/containers/appdata/plex
+sudo mkdir -p /var/lib/containers/appdata/jellyfin
+sudo mkdir -p /var/lib/containers/appdata/overseerr
+sudo mkdir -p /var/lib/containers/appdata/wizarr
+sudo mkdir -p /var/lib/containers/appdata/nextcloud
+sudo mkdir -p /var/lib/containers/appdata/immich
+sudo mkdir -p /var/lib/containers/appdata/postgres
+sudo mkdir -p /var/lib/containers/appdata/redis
+
+# Set appropriate ownership (assuming dockeruser)
+sudo chown -R dockeruser:dockeruser /var/lib/containers/appdata
 ```
 
 ### Recommended Directory Structure
 
 ```
-/home/dockeruser/           (or /home/core/)
-├── compose/                # Container orchestration files
-│   ├── media/
-│   │   ├── docker-compose.yml (or compose.yaml)
-│   │   └── .env
-│   ├── web/
-│   │   ├── docker-compose.yml
-│   │   └── .env
-│   └── cloud/
-│       ├── docker-compose.yml
-│       └── .env
-└── appdata/                # Application persistent data
-    ├── plex/
-    ├── jellyfin/
-    ├── overseerr/
-    ├── wizarr/
-    ├── nextcloud/
-    ├── immich/
-    ├── postgres/
-    └── redis/
+/srv/containers/            # Container orchestration files
+├── media/
+│   ├── compose.yml (or docker-compose.yml)
+│   └── .env
+├── web/
+│   ├── compose.yml
+│   └── .env
+└── cloud/
+    ├── compose.yml
+    └── .env
+
+/var/lib/containers/appdata/  # Application persistent data
+├── plex/
+├── jellyfin/
+├── overseerr/
+├── wizarr/
+├── nextcloud/
+├── immich/
+├── postgres/
+└── redis/
 ```
 
 ### Alternative: Consolidated Structure
 
 ```
-/home/dockeruser/
-├── compose/
-│   ├── docker-compose.yml  # All services in one file
-│   └── .env
-└── appdata/
-    └── [service directories as above]
+/srv/containers/
+├── compose.yml             # All services in one file
+└── .env
+
+/var/lib/containers/appdata/
+└── [service directories as above]
 ```
 
 ---
@@ -134,28 +137,25 @@ mkdir -p ~/appdata/redis
 
 WireGuard provides secure VPN connectivity for remote access and VPS tunneling.
 
-### Configuration Files Location
-
-The WireGuard configuration lives in `/etc/wireguard/wg0.conf`. The image includes a template and helper scripts.
-
 ### Generate WireGuard Keys and Configuration
 
-If you cloned this repository, you can use the provided scripts:
+The setup scripts are located in `~/setup/wireguard-setup/`:
 
 ```bash
 # Navigate to the wireguard setup directory
-cd /usr/share/wireguard-setup  # If scripts are bundled
-# OR clone the repo and navigate to config/wireguard/
+cd ~/setup/wireguard-setup
 
 # 1. Generate all required keys
 ./generate-keys.sh
 
 # This creates:
-# - Server private/public key pair
-# - Peer keys for Desktop, VPS, iPhone, and Laptop
-# - A .env file with all keys
-# - Individual key files in keys/ directory
+# - keys/ directory with all key files
+# - .env file with all keys and WG_OUTBOUND_INTERFACE
+# - Server keys: server-private.key, server-public.key
+# - Peer keys for: Desktop, VPS, iPhone, Laptop (private, public, and preshared keys)
 ```
+
+The script will attempt to auto-detect your WAN interface and set `WG_OUTBOUND_INTERFACE` in the `.env` file. If detection fails or you need to change it, edit `.env` and update the value (e.g., `enp1s0`, `eno1`, etc.).
 
 ### Apply Configuration
 
@@ -163,44 +163,32 @@ cd /usr/share/wireguard-setup  # If scripts are bundled
 # 2. Generate wg0.conf from the template
 ./apply-config.sh
 
-# This reads the .env file and generates wg0.conf with all keys filled in
-```
-
-### Update Network Interface
-
-**Important**: The default template uses `eth0` as the network interface. Update this if your system uses a different interface:
-
-```bash
-# Find your network interface name
-ip link show
-
-# Common interface names:
-# - eth0 (common in VMs)
-# - enp1s0 (PCI Ethernet)
-# - eno1 (onboard Ethernet)
-# - wlan0 (wireless)
-
-# Edit the template or generated config to use your interface
-sudo nano /etc/wireguard/wg0.conf
-
-# Look for the PostUp/PostDown lines and update eth0 to your interface:
-# PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o YOUR_INTERFACE -j MASQUERADE
+# This script:
+# - Reads keys from .env
+# - Validates WG_OUTBOUND_INTERFACE (auto-detects if not set)
+# - Substitutes placeholders in wg0.conf.template
+# - Generates wg0.conf with proper permissions (600)
 ```
 
 ### Export Peer Configurations
 
 ```bash
-# 3. Generate client configuration files
+# 3. Generate client configuration files for peers
 ./export-peer-configs.sh --endpoint your.public.ip:51820 \
     --allowed-ips 10.253.0.0/24 \
     --dns 1.1.1.1
 
-# Replace:
-# - your.public.ip: Your public IP or domain
-# - allowed-ips: Networks accessible through the VPN
-# - dns: DNS server for VPN clients
+# Options:
+# --endpoint: Required. Your public IP or domain with port (e.g., vpn.example.com:51820)
+# --allowed-ips: Networks accessible through VPN (default: 10.253.0.0/24)
+# --dns: Optional DNS server for clients (e.g., 1.1.1.1)
+# --output-dir: Directory for configs (default: ./peer-configs)
 
-# This creates QR codes and config files in peer-configs/
+# This creates individual .conf files in peer-configs/:
+# - desktop.conf
+# - vps.conf
+# - iphone.conf
+# - laptop.conf
 ```
 
 ### Deploy Configuration
@@ -223,27 +211,11 @@ sudo wg show
 - **Server IP**: `10.253.0.1/24` (NAB9 mini PC)
 - **Listen Port**: `51820`
 - **Network Range**: `10.253.0.0/24`
-- **Default Peers**:
-  - LAN-Desktop: `10.253.0.6/32`
+- **Configured Peers**:
+  - LAN-Desktop-Justin: `10.253.0.6/32`
   - VPS: `10.253.0.8/32`
   - iPhone: `10.253.0.9/32`
-  - Laptop: `10.253.0.11/32`
-
-### Manual Configuration (Without Scripts)
-
-If you prefer to configure manually:
-
-```bash
-# Generate server keys
-wg genkey | sudo tee /etc/wireguard/server_private.key
-sudo cat /etc/wireguard/server_private.key | wg pubkey | sudo tee /etc/wireguard/server_public.key
-
-# Generate peer keys (repeat for each peer)
-wg genkey | tee peer_private.key | wg pubkey > peer_public.key
-
-# Create /etc/wireguard/wg0.conf manually using the template as reference
-sudo nano /etc/wireguard/wg0.conf
-```
+  - Framework Laptop Justin: `10.253.0.11/32`
 
 ---
 
@@ -355,125 +327,92 @@ sudo mount -a
 
 ## 5. Container Setup
 
-Choose between Podman Compose (recommended for CoreOS/immutable systems) or Docker.
+### Setup Templates
+
+Compose templates and a `.env.example` are provided in `~/setup/compose-setup/`. Copy these to `/srv/containers/` as your starting point:
+
+```bash
+# Copy compose templates to working location
+sudo cp -r ~/setup/compose-setup/* /srv/containers/
+sudo chown -R core:core /srv/containers
+cd /srv/containers
+```
+
+---
 
 ### Option A: Podman Compose (Recommended)
 
-uCore/Fedora CoreOS comes with Podman pre-installed. Podman is daemonless and more aligned with CoreOS philosophy.
+Podman Compose is pre-installed in the image.
 
-#### Install Podman Compose
+#### Setup Compose Files
 
-```bash
-# Install podman-compose
-pip3 install --user podman-compose
-
-# OR use the system package if available
-sudo rpm-ostree install podman-compose
-sudo systemctl reboot
-```
-
-#### Create Compose Files
-
-Navigate to your compose directory and create compose files for your services:
+Templates are provided in `~/setup/compose-setup/`:
+- `media.yml` - Plex, Jellyfin, Tautulli
+- `web.yml` - Overseerr, Wizarr, Organizr, Homepage
+- `cloud.yml` - Nextcloud (with PostgreSQL, Redis, Collabora) and Immich
+- `.env.example` - Environment variables template
 
 ```bash
-cd ~/compose/media
+# Copy templates to /srv/containers
+sudo cp ~/setup/compose-setup/*.yml /srv/containers/
+sudo cp ~/setup/compose-setup/.env.example /srv/containers/.env
+
+# Set ownership
+sudo chown -R dockeruser:dockeruser /srv/containers
+
+# Edit the .env file with your actual values
+cd /srv/containers
+nano .env
 ```
 
-Create `docker-compose.yml` (or `compose.yaml`):
+#### Configure Environment Variables
 
-```yaml
-version: "3.9"
+Edit `/srv/containers/.env` and configure:
 
-services:
-  plex:
-    image: lscr.io/linuxserver/plex:latest
-    container_name: plex
-    network_mode: host
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-      - VERSION=docker
-    volumes:
-      - /home/dockeruser/appdata/plex:/config
-      - /mnt/nas-media:/media:ro
-    devices:
-      - /dev/dri:/dev/dri  # Hardware transcoding
-    restart: unless-stopped
+**Required:**
+- `PUID` / `PGID` - Your user/group IDs (run `id` to find)
+- `TZ` - Your timezone (e.g., `America/New_York`)
+- `APPDATA_PATH` - Path to appdata (default: `/var/lib/containers/appdata`)
 
-  jellyfin:
-    image: lscr.io/linuxserver/jellyfin:latest
-    container_name: jellyfin
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-    volumes:
-      - /home/dockeruser/appdata/jellyfin:/config
-      - /mnt/nas-media:/media:ro
-    ports:
-      - 8096:8096
-      - 8920:8920  # HTTPS
-    devices:
-      - /dev/dri:/dev/dri
-    restart: unless-stopped
+**Service-specific:**
+- `PLEX_CLAIM_TOKEN` - Get from https://plex.tv/claim
+- `NEXTCLOUD_DB_PASSWORD` - Database password
+- `NEXTCLOUD_TRUSTED_DOMAINS` - Your Nextcloud domain
+- `IMMICH_DB_PASSWORD` - Immich database password
+- `COLLABORA_PASSWORD` - Collabora admin password
 
-  overseerr:
-    image: lscr.io/linuxserver/overseerr:latest
-    container_name: overseerr
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=America/New_York
-    volumes:
-      - /home/dockeruser/appdata/overseerr:/config
-    ports:
-      - 5055:5055
-    restart: unless-stopped
-```
-
-#### Create Environment File
-
-```bash
-# Create .env file for sensitive data
-cat > ~/compose/media/.env << 'EOF'
-# User/Group IDs (run `id` to find yours)
-PUID=1000
-PGID=1000
-
-# Timezone
-TZ=America/New_York
-
-# Paths
-APPDATA_DIR=/home/dockeruser/appdata
-MEDIA_DIR=/mnt/nas-media
-
-# Service-specific variables
-PLEX_CLAIM=claim-xxxxxxxxxxxx
-EOF
-```
+See `.env.example` for all available options.
 
 #### Start Services with Podman Compose
 
 ```bash
-cd ~/compose/media
-podman-compose up -d
+# Start individual stacks
+cd /srv/containers
+podman-compose -f media.yml up -d
+podman-compose -f web.yml up -d
+podman-compose -f cloud.yml up -d
 
 # View logs
-podman-compose logs -f
+podman-compose -f media.yml logs -f
+
+# Stop services
+podman-compose -f media.yml down
+```
 
 # Stop services
 podman-compose down
 ```
 
-#### Create Systemd Service for Auto-Start
+#### Create Systemd Services for Auto-Start
+
+Create separate services for each stack:
 
 ```bash
-# Create a user systemd service
-mkdir -p ~/.config/systemd/user
+# Media stack service
+sudo nano /etc/systemd/system/podman-compose-media.service
+```
 
-cat > ~/.config/systemd/user/podman-compose-media.service << 'EOF'
+```ini
 [Unit]
 Description=Podman Compose - Media Stack
 Requires=network-online.target
@@ -482,72 +421,112 @@ After=network-online.target mnt-nas-media.mount
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/home/dockeruser/compose/media
-ExecStart=/usr/local/bin/podman-compose up -d
-ExecStop=/usr/local/bin/podman-compose down
+WorkingDirectory=/srv/containers
+ExecStart=/usr/local/bin/podman-compose -f media.yml up -d
+ExecStop=/usr/local/bin/podman-compose -f media.yml down
 TimeoutStartSec=0
 
 [Install]
-WantedBy=default.target
-EOF
+WantedBy=multi-user.target
+```
 
-# Enable and start
-systemctl --user enable podman-compose-media
-systemctl --user start podman-compose-media
+```bash
+# Web stack service
+sudo nano /etc/systemd/system/podman-compose-web.service
+```
 
-# Enable lingering so service starts at boot even when user not logged in
-sudo loginctl enable-linger dockeruser
+```ini
+[Unit]
+Description=Podman Compose - Web Stack
+Requires=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/containers
+ExecStart=/usr/local/bin/podman-compose -f web.yml up -d
+ExecStop=/usr/local/bin/podman-compose -f web.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Cloud stack service
+sudo nano /etc/systemd/system/podman-compose-cloud.service
+```
+
+```ini
+[Unit]
+Description=Podman Compose - Cloud Stack
+Requires=network-online.target
+After=network-online.target mnt-nas-nextcloud.mount mnt-nas-immich.mount
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/containers
+ExecStart=/usr/local/bin/podman-compose -f cloud.yml up -d
+ExecStop=/usr/local/bin/podman-compose -f cloud.yml down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+# Enable and start services
+sudo systemctl daemon-reload
+sudo systemctl enable podman-compose-media
+sudo systemctl enable podman-compose-web
+sudo systemctl enable podman-compose-cloud
+
+sudo systemctl start podman-compose-media
+sudo systemctl start podman-compose-web
+sudo systemctl start podman-compose-cloud
 ```
 
 ---
 
 ### Option B: Docker
 
-If you prefer Docker over Podman:
+Docker and Docker Compose are pre-installed in the image.
 
-#### Install Docker
+#### Setup Compose Files
 
-```bash
-# Layer Docker onto the CoreOS system
-sudo rpm-ostree install docker-ce docker-ce-cli containerd.io docker-compose-plugin
-
-# Reboot to apply
-sudo systemctl reboot
-
-# After reboot, enable and start Docker
-sudo systemctl enable docker
-sudo systemctl start docker
-
-# Add your user to docker group
-sudo usermod -aG docker $USER
-
-# Log out and back in for group changes to take effect
-```
-
-#### Create Docker Compose Files
-
-The compose file format is identical to Podman:
+Use the same templates from `~/setup/compose-setup/`:
 
 ```bash
-cd ~/compose/media
-nano docker-compose.yml
-# (Use the same compose file content as shown in Podman section)
+# Copy templates to /srv/containers
+sudo cp ~/setup/compose-setup/*.yml /srv/containers/
+sudo cp ~/setup/compose-setup/.env.example /srv/containers/.env
+
+# Set ownership
+sudo chown -R dockeruser:dockeruser /srv/containers
+
+# Edit the .env file
+cd /srv/containers
+nano .env
 ```
 
 #### Start Services with Docker Compose
 
 ```bash
-cd ~/compose/media
-docker compose up -d
+cd /srv/containers
+docker compose -f media.yml up -d
+docker compose -f web.yml up -d
+docker compose -f cloud.yml up -d
 
 # View logs
-docker compose logs -f
+docker compose -f media.yml logs -f
 
 # Stop services
-docker compose down
+docker compose -f media.yml down
 ```
 
-#### Create Systemd Service for Docker Compose
+#### Create Systemd Services for Docker Compose
 
 ```bash
 sudo nano /etc/systemd/system/docker-compose-media.service
@@ -562,20 +541,27 @@ After=docker.service network-online.target mnt-nas-media.mount
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/home/dockeruser/compose/media
-ExecStart=/usr/bin/docker compose up -d
-ExecStop=/usr/bin/docker compose down
+WorkingDirectory=/srv/containers
+ExecStart=/usr/bin/docker compose -f media.yml up -d
+ExecStop=/usr/bin/docker compose -f media.yml down
 TimeoutStartSec=0
 
 [Install]
 WantedBy=multi-user.target
 ```
 
+Create similar services for `web.yml` and `cloud.yml`, then enable:
+
 ```bash
 # Enable and start
 sudo systemctl daemon-reload
 sudo systemctl enable docker-compose-media
+sudo systemctl enable docker-compose-web
+sudo systemctl enable docker-compose-cloud
+
 sudo systemctl start docker-compose-media
+sudo systemctl start docker-compose-web
+sudo systemctl start docker-compose-cloud
 ```
 
 ---
@@ -584,19 +570,23 @@ sudo systemctl start docker-compose-media
 
 ### Complete Stack Deployment
 
-If you're using multiple compose files (recommended for organization):
+Deploy all stacks using the provided compose files:
 
 ```bash
-# Deploy all stacks
-cd ~/compose/media && podman-compose up -d
-cd ~/compose/web && podman-compose up -d
-cd ~/compose/cloud && podman-compose up -d
+cd /srv/containers
+
+# Start all services
+podman-compose -f media.yml up -d
+podman-compose -f web.yml up -d
+podman-compose -f cloud.yml up -d
 ```
 
-Or with a single consolidated compose file:
+Or if using systemd services:
 
 ```bash
-cd ~/compose && podman-compose up -d
+sudo systemctl start podman-compose-media
+sudo systemctl start podman-compose-web
+sudo systemctl start podman-compose-cloud
 ```
 
 ### Verify Services
@@ -609,17 +599,28 @@ docker ps
 
 # Check service health
 curl http://localhost:8096  # Jellyfin
-curl http://localhost:32400 # Plex
+curl http://localhost:32400 # Plex (if network_mode: host)
 curl http://localhost:5055  # Overseerr
+curl http://localhost:8080  # Nextcloud
+curl http://localhost:2283  # Immich
 ```
 
 ### Access Services
 
+**Media Services (Direct WAN Access):**
 - **Plex**: `http://your-ip:32400/web`
 - **Jellyfin**: `http://your-ip:8096`
+
+**Web Services (via VPS Proxy):**
 - **Overseerr**: `http://your-ip:5055`
-- **Nextcloud**: `http://your-ip:8080` (or via reverse proxy)
-- **Immich**: `http://your-ip:2283` (or via reverse proxy)
+- **Wizarr**: `http://your-ip:5690`
+- **Organizr**: `http://your-ip:9983`
+- **Homepage**: `http://your-ip:3000`
+
+**Cloud Services (via VPS Proxy):**
+- **Nextcloud**: `http://your-ip:8080`
+- **Collabora**: `http://your-ip:9980`
+- **Immich**: `http://your-ip:2283`
 
 ---
 
@@ -669,22 +670,22 @@ podman restart <container-name>
 docker restart <container-name>
 
 # Recreate containers
-cd ~/compose/media
-podman-compose down && podman-compose up -d
+cd /srv/containers
+podman-compose -f media.yml down && podman-compose -f media.yml up -d
 ```
 
 ### Permission Issues
 
 ```bash
 # Fix appdata permissions
-sudo chown -R 1000:1000 ~/appdata
+sudo chown -R 1000:1000 /var/lib/containers/appdata
 
 # Check SELinux context (if enabled)
-ls -Z ~/appdata
+ls -Z /var/lib/containers/appdata
 
 # Fix SELinux labels if needed
-sudo semanage fcontext -a -t container_file_t "~/appdata(/.*)?"
-sudo restorecon -Rv ~/appdata
+sudo semanage fcontext -a -t container_file_t "/var/lib/containers/appdata(/.*)?"
+sudo restorecon -Rv /var/lib/containers/appdata
 ```
 
 ### System Updates Breaking Things
