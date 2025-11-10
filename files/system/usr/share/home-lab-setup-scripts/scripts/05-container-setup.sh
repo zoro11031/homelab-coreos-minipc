@@ -25,12 +25,11 @@ TEMPLATE_DIR_HOME="${HOME}/setup/compose-setup"
 TEMPLATE_DIR_USR="/usr/share/compose-setup"
 CONTAINERS_BASE="/srv/containers"
 
-# Service configurations
-declare -A SERVICES=(
-    [media]="media.yml"
-    [web]="web.yml"
-    [cloud]="cloud.yml"
-)
+# Service configurations (dynamically populated)
+declare -A SERVICES=()
+
+# Selected services to setup (will be populated by user selection)
+declare -a SELECTED_SERVICES=()
 
 # ============================================================================
 # Template Detection Functions
@@ -58,6 +57,44 @@ find_compose_templates() {
     log_info "  - $TEMPLATE_DIR_HOME"
     log_info "  - $TEMPLATE_DIR_USR"
     return 1
+}
+
+discover_available_stacks() {
+    local template_dir="$1"
+
+    log_step "Discovering Available Container Stacks"
+
+    # Clear existing services
+    SERVICES=()
+
+    # Find all .yml and .yaml files in the template directory
+    local count=0
+    while IFS= read -r -d '' yaml_file; do
+        local filename
+        filename=$(basename "$yaml_file")
+
+        # Skip .env.example and any hidden files
+        if [[ "$filename" == .* ]]; then
+            continue
+        fi
+
+        # Get service name (filename without extension)
+        local service_name="${filename%.yml}"
+        service_name="${service_name%.yaml}"
+
+        # Add to SERVICES array
+        SERVICES["$service_name"]="$filename"
+        log_success "Found stack: $service_name ($filename)"
+        ((count++))
+    done < <(find "$template_dir" -maxdepth 1 -type f \( -name "*.yml" -o -name "*.yaml" \) -print0 2>/dev/null)
+
+    if [[ $count -eq 0 ]]; then
+        log_error "No compose YAML files found in $template_dir"
+        return 1
+    fi
+
+    log_success "Discovered $count container stack(s)"
+    return 0
 }
 
 check_template_files() {
@@ -90,6 +127,91 @@ check_template_files() {
 }
 
 # ============================================================================
+# Stack Selection Functions
+# ============================================================================
+
+select_container_stacks() {
+    log_step "Container Stack Selection"
+
+    echo ""
+    log_info "Available container stacks:"
+    echo ""
+
+    # Create sorted array of service names for consistent ordering
+    local -a service_list=()
+    for service in "${!SERVICES[@]}"; do
+        service_list+=("$service")
+    done
+    IFS=$'\n' service_list=($(sort <<<"${service_list[*]}"))
+    unset IFS
+
+    # Display available stacks
+    local i=1
+    for service in "${service_list[@]}"; do
+        echo "  $i) ${service} (${SERVICES[$service]})"
+        ((i++))
+    done
+    echo "  $i) All stacks"
+    echo ""
+
+    # Prompt for selection
+    log_info "Select which container stacks to setup:"
+    log_info "  - Enter numbers separated by spaces (e.g., '1 3' for first and third)"
+    log_info "  - Enter '$i' to setup all stacks"
+    log_info "  - Press Enter to setup all stacks (default)"
+    echo ""
+
+    local selection
+    read -r -p "$(echo -e "\033[1;36mYour selection\033[0m: ")" selection
+
+    # Default to all if empty
+    if [[ -z "$selection" ]]; then
+        selection="$i"
+    fi
+
+    # Clear selected services array
+    SELECTED_SERVICES=()
+
+    # Parse selection
+    if [[ "$selection" == "$i" ]]; then
+        # All stacks selected
+        log_success "Selected: All stacks"
+        SELECTED_SERVICES=("${service_list[@]}")
+    else
+        # Individual stacks selected
+        for num in $selection; do
+            # Validate number
+            if [[ ! "$num" =~ ^[0-9]+$ ]] || [[ "$num" -lt 1 ]] || [[ "$num" -gt ${#service_list[@]} ]]; then
+                log_warning "Invalid selection: $num (skipping)"
+                continue
+            fi
+
+            # Add to selected services (arrays are 0-indexed)
+            local idx=$((num - 1))
+            SELECTED_SERVICES+=("${service_list[$idx]}")
+        done
+
+        # Show selected stacks
+        if [[ ${#SELECTED_SERVICES[@]} -eq 0 ]]; then
+            log_error "No valid stacks selected"
+            return 1
+        fi
+
+        log_success "Selected stacks:"
+        for service in "${SELECTED_SERVICES[@]}"; do
+            log_info "  - $service"
+        done
+    fi
+
+    echo ""
+
+    # Save selected services to config for potential re-runs
+    save_config "SELECTED_SERVICES" "${SELECTED_SERVICES[*]}"
+
+    return 0
+}
+
+# ============================================================================
 # Template Copy Functions
 # ============================================================================
 
@@ -103,7 +225,8 @@ copy_compose_templates() {
 
     local copied_count=0
 
-    for service in "${!SERVICES[@]}"; do
+    # Only copy selected services
+    for service in "${SELECTED_SERVICES[@]}"; do
         local template_file="${SERVICES[$service]}"
         local src="${template_dir}/${template_file}"
         local dst_dir="${CONTAINERS_BASE}/${service}"
@@ -111,9 +234,14 @@ copy_compose_templates() {
 
         # Ensure destination directory exists
         if [[ ! -d "$dst_dir" ]]; then
-            log_error "Destination directory does not exist: $dst_dir"
-            log_info "Run 02-directory-setup.sh first"
-            return 1
+            log_warning "Destination directory does not exist: $dst_dir"
+            log_info "Creating directory: $dst_dir"
+            if ! sudo mkdir -p "$dst_dir"; then
+                log_error "Failed to create directory: $dst_dir"
+                return 1
+            fi
+            sudo chown "${setup_user}:${setup_user}" "$dst_dir"
+            sudo chmod 755 "$dst_dir"
         fi
 
         # Copy template
@@ -254,6 +382,19 @@ configure_cloud_env() {
     create_env_file "$env_file" "cloud"
 }
 
+configure_generic_env() {
+    local env_file="$1"
+    local service="$2"
+
+    log_step "Configuring ${service^} Stack Environment"
+
+    log_info "No specific configuration prompts for this stack."
+    log_info "Creating basic environment file with default settings."
+
+    # Create env file with just base configuration
+    create_env_file "$env_file" "$service"
+}
+
 create_env_file() {
     local env_file="$1"
     local service="$2"
@@ -350,7 +491,7 @@ interactive_container_setup() {
     log_step "Container Service Configuration"
 
     echo ""
-    log_info "This will configure environment variables for all container services."
+    log_info "This will configure environment variables for selected container services."
     log_info "You'll be prompted for passwords and configuration values."
     echo ""
 
@@ -361,48 +502,37 @@ interactive_container_setup() {
     # Create base configuration
     create_base_env_config
 
-    # Configure each service
-    local setup_user
-    setup_user=$(load_config "SETUP_USER")
+    # Configure each selected service
+    for service in "${SELECTED_SERVICES[@]}"; do
+        local env_file="${CONTAINERS_BASE}/${service}/.env"
 
-    # Media stack
-    local media_env="${CONTAINERS_BASE}/media/.env"
-    if [[ -f "$media_env" ]]; then
-        log_info "Media environment file already exists"
-        if ! prompt_yes_no "Reconfigure media stack?" "no"; then
-            log_info "Skipping media configuration"
-        else
-            configure_media_env "$media_env"
+        # Check if env file already exists
+        if [[ -f "$env_file" ]]; then
+            log_info "${service^} environment file already exists"
+            if ! prompt_yes_no "Reconfigure ${service} stack?" "no"; then
+                log_info "Skipping ${service} configuration"
+                continue
+            fi
         fi
-    else
-        configure_media_env "$media_env"
-    fi
 
-    # Web stack
-    local web_env="${CONTAINERS_BASE}/web/.env"
-    if [[ -f "$web_env" ]]; then
-        log_info "Web environment file already exists"
-        if ! prompt_yes_no "Reconfigure web stack?" "no"; then
-            log_info "Skipping web configuration"
-        else
-            configure_web_env "$web_env"
-        fi
-    else
-        configure_web_env "$web_env"
-    fi
-
-    # Cloud stack
-    local cloud_env="${CONTAINERS_BASE}/cloud/.env"
-    if [[ -f "$cloud_env" ]]; then
-        log_info "Cloud environment file already exists"
-        if ! prompt_yes_no "Reconfigure cloud stack?" "no"; then
-            log_info "Skipping cloud configuration"
-        else
-            configure_cloud_env "$cloud_env"
-        fi
-    else
-        configure_cloud_env "$cloud_env"
-    fi
+        # Configure based on service type
+        case $service in
+            media)
+                configure_media_env "$env_file"
+                ;;
+            web)
+                configure_web_env "$env_file"
+                ;;
+            cloud)
+                configure_cloud_env "$env_file"
+                ;;
+            *)
+                # Generic configuration for unknown stacks
+                log_info "Configuring ${service} stack with base settings"
+                configure_generic_env "$env_file" "$service"
+                ;;
+        esac
+    done
 
     log_success "✓ Container configuration complete"
 }
@@ -416,7 +546,8 @@ verify_container_setup() {
 
     local all_good=true
 
-    for service in "${!SERVICES[@]}"; do
+    # Only verify selected services
+    for service in "${SELECTED_SERVICES[@]}"; do
         local service_dir="${CONTAINERS_BASE}/${service}"
         local compose_file="${service_dir}/compose.yml"
         local env_file="${service_dir}/.env"
@@ -468,7 +599,8 @@ show_setup_summary() {
     log_info "Service Configurations:"
     print_separator
 
-    for service in "${!SERVICES[@]}"; do
+    # Only show selected services
+    for service in "${SELECTED_SERVICES[@]}"; do
         echo "${CONTAINERS_BASE}/${service}/"
         echo "  ├── compose.yml"
         echo "  └── .env"
@@ -511,7 +643,26 @@ main() {
             remove_marker "container-setup-complete"
         else
             log_info "Skipping container setup"
-            show_setup_summary
+
+            # Load previous selection for summary display
+            local template_dir
+            if template_dir=$(find_compose_templates); then
+                discover_available_stacks "$template_dir" > /dev/null 2>&1 || true
+
+                # Try to load previous selection
+                local saved_services
+                saved_services=$(load_config "SELECTED_SERVICES" "")
+                if [[ -n "$saved_services" ]]; then
+                    read -ra SELECTED_SERVICES <<< "$saved_services"
+                else
+                    # Fallback: assume all services if no saved selection
+                    for service in "${!SERVICES[@]}"; do
+                        SELECTED_SERVICES+=("$service")
+                    done
+                fi
+
+                show_setup_summary
+            fi
             exit 0
         fi
     fi
@@ -523,13 +674,25 @@ main() {
         exit 1
     fi
 
-    # Check template files
+    # Discover available stacks
+    if ! discover_available_stacks "$template_dir"; then
+        log_error "Failed to discover container stacks"
+        exit 1
+    fi
+
+    # Let user select which stacks to setup
+    if ! select_container_stacks; then
+        log_error "Stack selection cancelled or failed"
+        exit 1
+    fi
+
+    # Check template files for selected stacks
     if ! check_template_files "$template_dir"; then
         log_error "Missing required template files"
         exit 1
     fi
 
-    # Copy templates
+    # Copy templates for selected stacks
     if ! copy_compose_templates "$template_dir"; then
         log_error "Failed to copy templates"
         exit 1
