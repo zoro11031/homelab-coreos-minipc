@@ -9,21 +9,17 @@ chown -R core:core /home/core/setup
 mkdir -p /srv/containers
 
 # Copy compose files to production location
-cp -r /usr/share/compose-setup/*.yml /srv/containers/
-cp /usr/share/compose-setup/.env.example /srv/containers/.env.example
+# Use a loop to safely handle potential missing files
+if ls /usr/share/compose-setup/*.yml >/dev/null 2>&1; then
+    cp /usr/share/compose-setup/*.yml /srv/containers/
+fi
 
-# Create appdata directory structure
-mkdir -p /var/lib/containers/appdata/plex
-mkdir -p /var/lib/containers/appdata/jellyfin
-mkdir -p /var/lib/containers/appdata/tautulli
-mkdir -p /var/lib/containers/appdata/overseerr
-mkdir -p /var/lib/containers/appdata/wizarr
-mkdir -p /var/lib/containers/appdata/organizr
-mkdir -p /var/lib/containers/appdata/homepage
-mkdir -p /var/lib/containers/appdata/nextcloud
-mkdir -p /var/lib/containers/appdata/immich
-mkdir -p /var/lib/containers/appdata/postgres
-mkdir -p /var/lib/containers/appdata/redis
+if [ -f /usr/share/compose-setup/.env.example ]; then
+    cp /usr/share/compose-setup/.env.example /srv/containers/.env.example
+fi
+
+# Create appdata directory structure using brace expansion
+mkdir -p /var/lib/containers/appdata/{plex,jellyfin,tautulli,overseerr,wizarr,organizr,homepage,nextcloud,immich,postgres,redis}
 
 # Set appropriate ownership (dockeruser:dockeruser)
 # Note: dockeruser may not exist yet at first boot, so we defer this to post-install
