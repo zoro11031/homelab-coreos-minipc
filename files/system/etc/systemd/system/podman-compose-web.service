@@ -1,5 +1,6 @@
 [Unit]
 Description=Podman Compose - Web Stack
+Wants=network-online.target
 After=network-online.target
 
 [Service]
