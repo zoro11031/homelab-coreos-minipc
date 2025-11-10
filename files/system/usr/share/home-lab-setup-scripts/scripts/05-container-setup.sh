@@ -649,7 +649,9 @@ main() {
             # Load previous selection for summary display
             local template_dir
             if template_dir=$(find_compose_templates); then
-                discover_available_stacks "$template_dir" > /dev/null 2>&1 || true
+                if ! discover_available_stacks "$template_dir" > /dev/null 2>&1; then
+                    log_warning "Could not discover available container stacks for summary display. The summary may be incomplete."
+                fi
 
                 # Try to load previous selection
                 local saved_services
