@@ -1,0 +1,16 @@
+[Unit]
+Description=Docker Compose - Cloud Stack
+After=docker.service mnt-nas-nextcloud.mount mnt-nas-immich.mount
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=dockeruser
+Group=dockeruser
+WorkingDirectory=/home/dockeruser/compose/cloud
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target
