@@ -182,9 +182,21 @@ select_container_stacks() {
     else
         # Individual stacks selected
         for num in $selection; do
-            # Validate number
-            if [[ ! "$num" =~ ^[0-9]+$ ]] || [[ "$num" -lt 1 ]] || [[ "$num" -gt ${#service_list[@]} ]]; then
-                log_warning "Invalid selection: $num (skipping)"
+            # Validate number is numeric
+            if [[ ! "$num" =~ ^[0-9]+$ ]]; then
+                log_warning "Invalid selection: $num (not a number, skipping)"
+                continue
+            fi
+            
+            # Explicitly check for "All stacks" option number
+            if [[ "$num" -eq "$i" ]]; then
+                log_warning "Cannot select 'All stacks' (option $i) with individual stacks. Use '$i' alone or select specific stacks."
+                continue
+            fi
+            
+            # Validate number is within valid range
+            if [[ "$num" -lt 1 ]] || [[ "$num" -gt ${#service_list[@]} ]]; then
+                log_warning "Invalid selection: $num (valid range: 1-${#service_list[@]}, skipping)"
                 continue
             fi
 
