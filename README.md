@@ -36,17 +36,17 @@ Pulls media from the file server over NFS and exposes select services to the int
     ↓                                         ↓
 ┌────────────────────────┐          Direct Ports 8096/8920 & 32400
 │   DigitalOcean VPS     │          (NAB9 Mini PC only)
-│  ┌──────────────────┐  │                     │
+│  ┌──────────────────┐  │                    │
 │  │ Nginx Proxy      │  │                     │
 │  │ Manager (SSL)    │  │                     │
 │  │ Routes: Overseerr│  │                     │
 │  │ Wizarr / Immich  │  │                     │
 │  │ Nextcloud        │  │                     │
-│  └──────────────────┘  │                     │
+│  └──────────────────┘│                     │
 │                        │                     │
 │   WireGuard Tunnel     │                     │
 │    (encrypted)         │                     │
-└────────────┬───────────┘                     │
+└────────────┬───────────┘                   │
              │                                 │
              ↓                                 │
 ┌────────────────────────────────────────────┴─────────────┐
@@ -55,16 +55,16 @@ Pulls media from the file server over NFS and exposes select services to the int
 │  • Direct exposure for Jellyfin/Plex                     │
 │  • WAN ingress via VPS                                   │
 └───────────────┬──────────────────────────────────────────┘
-                │
+                  │
          LAN (NFS Access)
-                │
-                ↓
-┌─────────────────────────────────────────┐
-│      File Server (Ublue CoreOS)         │
+                 │
+                 ↓
+┌───────────────────────────────────────────┐
+│      File Server (Ublue CoreOS)               │
 │  • SnapRAID + mergerfs / NFS / qBittorrentVPN |
-│  • Sonarr / Radarr / Lidarr / Prowlarr       │
-│  • LAN-only access                           │
-└─────────────────────────────────────────┘
+│  • Sonarr / Radarr / Lidarr / Prowlarr        │
+│  • LAN-only access                            │
+└───────────────────────────────────────────┘
                 │
                 ↓
           DAS Storage
