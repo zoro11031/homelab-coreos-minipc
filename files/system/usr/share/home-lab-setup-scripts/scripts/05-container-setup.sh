@@ -146,9 +146,7 @@ select_container_stacks() {
     for service in "${!SERVICES[@]}"; do
         service_list+=("$service")
     done
-    IFS=$'\n' service_list=($(sort <<<"${service_list[*]}"))
-    unset IFS
-
+    mapfile -t service_list < <(printf '%s\n' "${service_list[@]}" | sort)
     # Display available stacks
     local i=1
     for service in "${service_list[@]}"; do
