@@ -59,8 +59,8 @@ show_main_menu() {
     print_separator
     echo ""
 
-    echo "  ${COLOR_BOLD}[A]${COLOR_RESET} Run All Steps (Complete Setup)"
-    echo "  ${COLOR_BOLD}[Q]${COLOR_RESET} Quick Setup (Skip WireGuard)"
+    echo -e "  ${COLOR_BOLD}[A]${COLOR_RESET} Run All Steps (Complete Setup)"
+    echo -e "  ${COLOR_BOLD}[Q]${COLOR_RESET} Quick Setup (Skip WireGuard)"
     echo ""
 
     print_separator
@@ -82,8 +82,8 @@ show_main_menu() {
             status="${COLOR_GREEN}✓${COLOR_RESET}"
         fi
 
-        echo "  ${COLOR_BOLD}[$i]${COLOR_RESET} $status $title"
-        echo "      ${COLOR_CYAN}→${COLOR_RESET} $desc"
+        echo -e "  ${COLOR_BOLD}[$i]${COLOR_RESET} $status $title"
+        echo -e "      ${COLOR_CYAN}→${COLOR_RESET} $desc"
         echo ""
     done
 
@@ -91,11 +91,11 @@ show_main_menu() {
     log_info "Other Options:"
     print_separator
     echo ""
-    echo "  ${COLOR_BOLD}[T]${COLOR_RESET} Troubleshooting Tool"
-    echo "  ${COLOR_BOLD}[S]${COLOR_RESET} Show Setup Status"
-    echo "  ${COLOR_BOLD}[R]${COLOR_RESET} Reset Setup (Clear markers)"
-    echo "  ${COLOR_BOLD}[H]${COLOR_RESET} Help"
-    echo "  ${COLOR_BOLD}[X]${COLOR_RESET} Exit"
+    echo -e "  ${COLOR_BOLD}[T]${COLOR_RESET} Troubleshooting Tool"
+    echo -e "  ${COLOR_BOLD}[S]${COLOR_RESET} Show Setup Status"
+    echo -e "  ${COLOR_BOLD}[R]${COLOR_RESET} Reset Setup (Clear markers)"
+    echo -e "  ${COLOR_BOLD}[H]${COLOR_RESET} Help"
+    echo -e "  ${COLOR_BOLD}[X]${COLOR_RESET} Exit"
     echo ""
 }
 
