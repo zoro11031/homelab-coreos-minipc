@@ -183,6 +183,15 @@ prompt_password() {
     done
 }
 
+prompt_with_color() {
+    local prompt="$1"
+    local color="${2:-$COLOR_CYAN}"
+    local value
+    
+    read -r -p "$(echo -e "${COLOR_BOLD}${color}${prompt}${COLOR_RESET}: ")" value
+    echo "$value"
+}
+
 # ============================================================================
 # Validation Functions
 # ============================================================================
@@ -630,7 +639,7 @@ remove_marker() {
 export -f log_info log_success log_warning log_error log_step
 export -f print_header print_separator
 export -f save_config load_config config_exists
-export -f prompt_yes_no prompt_input prompt_password
+export -f prompt_yes_no prompt_input prompt_password prompt_with_color
 export -f validate_ip validate_port validate_path
 export -f check_ucore check_command check_package check_systemd_service get_service_location
 export -f detect_container_runtime get_compose_command select_container_runtime

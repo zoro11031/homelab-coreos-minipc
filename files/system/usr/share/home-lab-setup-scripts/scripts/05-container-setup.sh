@@ -164,7 +164,7 @@ select_container_stacks() {
     echo ""
 
     local selection
-    read -r -p "$(echo -e "\033[1;36mYour selection\033[0m: ")" selection
+    selection=$(prompt_with_color "Your selection")
 
     # Default to all if empty
     if [[ -z "$selection" ]]; then
