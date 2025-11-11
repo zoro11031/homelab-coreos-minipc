@@ -33,7 +33,13 @@ compose/.env
 .DS_Store
 
 # IDE and editor files
-.vscode/
+# VS Code: Keep project settings, exclude user settings
+.vscode/*.log
+.vscode/settings.local.json
+.vscode/.react/
+.vscode-test/
+
+# Other IDEs
 .idea/
 *.code-workspace
 
@@ -45,3 +51,23 @@ Thumbs.db
 ignition/*.bu
 ignition/*.ign
 !ignition/*.template
+
+# Go build artifacts
+homelab-setup/bin/
+homelab-setup/*.exe
+homelab-setup/*.dll
+homelab-setup/*.so
+homelab-setup/*.dylib
+
+# Go test artifacts
+homelab-setup/*.test
+homelab-setup/*.out
+homelab-setup/coverage.out
+homelab-setup/coverage.html
+homelab-setup/.coverage
+
+# Go vendor directory (if using vendoring)
+homelab-setup/vendor/
+
+# Dev container volumes (local development)
+.devcontainer/.cache/

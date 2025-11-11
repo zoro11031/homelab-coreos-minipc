@@ -1,0 +1,81 @@
+# Git files
+.git/
+.gitignore
+.gitattributes
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Go build artifacts
+homelab-setup/bin/
+homelab-setup/*.exe
+homelab-setup/*.dll
+homelab-setup/*.so
+homelab-setup/*.dylib
+homelab-setup/*.test
+homelab-setup/*.out
+
+# Go cache and modules
+homelab-setup/vendor/
+**/go.sum
+
+# Test coverage
+*.coverage
+*.coverprofile
+coverage.txt
+coverage.html
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# IDE files
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# Build artifacts
+dist/
+build/
+*.tar.gz
+*.zip
+
+# Documentation build artifacts
+docs/_build/
+docs/.buildinfo
+
+# CI/CD
+.github/
+
+# Logs
+*.log
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# macOS
+.AppleDouble
+.LSOverride
+Icon
+._*
+
+# Linux
+.directory
+.Trash-*
+
+# Windows
+Desktop.ini
+$RECYCLE.BIN/
+
+# Backup files
+*.bak
+*.backup
+*.old

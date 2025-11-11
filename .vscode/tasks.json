@@ -1,0 +1,136 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build homelab-setup",
+			"type": "shell",
+			"command": "make",
+			"args": ["build"],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			},
+			"problemMatcher": ["$go"]
+		},
+		{
+			"label": "Test homelab-setup",
+			"type": "shell",
+			"command": "go",
+			"args": ["test", "./...", "-v"],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			},
+			"problemMatcher": ["$go"]
+		},
+		{
+			"label": "Test homelab-setup (with coverage)",
+			"type": "shell",
+			"command": "go",
+			"args": ["test", "./...", "-v", "-coverprofile=coverage.out"],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"group": "test",
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			},
+			"problemMatcher": ["$go"]
+		},
+		{
+			"label": "Clean build artifacts",
+			"type": "shell",
+			"command": "make",
+			"args": ["clean"],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Install homelab-setup",
+			"type": "shell",
+			"command": "make",
+			"args": ["install"],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			},
+			"problemMatcher": ["$go"]
+		},
+		{
+			"label": "Lint (golangci-lint)",
+			"type": "shell",
+			"command": "golangci-lint",
+			"args": ["run", "./..."],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"presentation": {
+				"reveal": "always",
+				"panel": "shared"
+			},
+			"problemMatcher": ["$go"]
+		},
+		{
+			"label": "Format code (gofmt)",
+			"type": "shell",
+			"command": "gofmt",
+			"args": ["-w", "."],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Go mod tidy",
+			"type": "shell",
+			"command": "go",
+			"args": ["mod", "tidy"],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "shared"
+			}
+		},
+		{
+			"label": "Go mod download",
+			"type": "shell",
+			"command": "go",
+			"args": ["mod", "download"],
+			"options": {
+				"cwd": "${workspaceFolder}/homelab-setup"
+			},
+			"presentation": {
+				"reveal": "silent",
+				"panel": "shared"
+			}
+		}
+	]
+}

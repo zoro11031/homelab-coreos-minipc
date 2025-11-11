@@ -1,0 +1,32 @@
+{
+	"recommendations": [
+		// Go development
+		"golang.go",
+
+		// Container development
+		"ms-vscode-remote.remote-containers",
+		"ms-azuretools.vscode-docker",
+
+		// Build tools
+		"ms-vscode.makefile-tools",
+
+		// Git
+		"eamodio.gitlens",
+		"mhutchie.git-graph",
+
+		// Code quality
+		"streetsidesoftware.code-spell-checker",
+		"editorconfig.editorconfig",
+
+		// YAML support
+		"redhat.vscode-yaml",
+
+		// Markdown
+		"yzhang.markdown-all-in-one",
+
+		// Shell scripting (for the original bash scripts)
+		"timonwong.shellcheck",
+		"foxundermoon.shell-format"
+	],
+	"unwantedRecommendations": []
+}

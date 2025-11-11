@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  devcontainer:
+    build:
+      context: ..
+      dockerfile: .devcontainer/Dockerfile
+
+    volumes:
+      # Mount the workspace
+      - ..:/workspace:cached
+
+      # Mount the Docker socket for container operations
+      - /var/run/docker.sock:/var/run/docker.sock
+
+      # Persist Go module cache
+      - go-modules:/go/pkg/mod
+
+      # Persist Go build cache
+      - go-build-cache:/home/vscode/.cache/go-build
+
+    # Keep container running
+    command: sleep infinity
+
+    # Use the host network for easier testing
+    network_mode: host
+
+    # Capabilities for debugging
+    cap_add:
+      - SYS_PTRACE
+
+    security_opt:
+      - seccomp:unconfined
+
+    # Environment variables
+    environment:
+      - CGO_ENABLED=0
+      - GOOS=linux
+      - GOARCH=amd64
+
+    # User configuration
+    user: vscode
+
+    # Working directory
+    working_dir: /workspace
+
+volumes:
+  # Named volumes for caching
+  go-modules:
+  go-build-cache:

@@ -1,0 +1,64 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Debug homelab-setup",
+			"type": "go",
+			"request": "launch",
+			"mode": "debug",
+			"program": "${workspaceFolder}/homelab-setup/cmd/homelab-setup",
+			"env": {},
+			"args": [],
+			"showLog": true
+		},
+		{
+			"name": "Debug homelab-setup (with args)",
+			"type": "go",
+			"request": "launch",
+			"mode": "debug",
+			"program": "${workspaceFolder}/homelab-setup/cmd/homelab-setup",
+			"env": {},
+			"args": [
+				"--help"
+			],
+			"showLog": true
+		},
+		{
+			"name": "Debug Current Test",
+			"type": "go",
+			"request": "launch",
+			"mode": "test",
+			"program": "${fileDirname}",
+			"env": {},
+			"showLog": true
+		},
+		{
+			"name": "Debug Current File",
+			"type": "go",
+			"request": "launch",
+			"mode": "debug",
+			"program": "${file}",
+			"env": {},
+			"showLog": true
+		},
+		{
+			"name": "Debug All Tests",
+			"type": "go",
+			"request": "launch",
+			"mode": "test",
+			"program": "${workspaceFolder}/homelab-setup",
+			"env": {},
+			"args": [
+				"-test.v"
+			],
+			"showLog": true
+		},
+		{
+			"name": "Attach to Process",
+			"type": "go",
+			"request": "attach",
+			"mode": "local",
+			"processId": "${command:pickProcess}"
+		}
+	]
+}

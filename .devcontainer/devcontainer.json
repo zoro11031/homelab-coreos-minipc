@@ -1,0 +1,82 @@
+{
+	"name": "UBlue uCore Homelab Setup - Go Development",
+
+	// Use docker-compose for more flexibility
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "devcontainer",
+	"workspaceFolder": "/workspace",
+
+	// Alternative: Use Dockerfile directly (comment out dockerComposeFile above and uncomment below)
+	// "build": {
+	// 	"dockerfile": "Dockerfile",
+	// 	"context": ".."
+	// },
+	// "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind",
+
+	// Configure tool-specific properties
+	"customizations": {
+		"vscode": {
+			// VS Code extensions to install
+			"extensions": [
+				"golang.go",
+				"ms-vscode.makefile-tools",
+				"redhat.vscode-yaml",
+				"eamodio.gitlens",
+				"streetsidesoftware.code-spell-checker"
+			],
+			// VS Code settings
+			"settings": {
+				"go.toolsManagement.checkForUpdates": "local",
+				"go.useLanguageServer": true,
+				"go.lintTool": "golangci-lint",
+				"go.lintOnSave": "package",
+				"editor.formatOnSave": true,
+				"go.formatTool": "gofmt",
+				"go.testFlags": ["-v"],
+				"go.coverOnSave": false,
+				"go.coverageDecorator": {
+					"type": "gutter"
+				},
+				"go.toolsEnvVars": {
+					"CGO_ENABLED": "0"
+				}
+			}
+		}
+	},
+
+	// Features to add to the dev container
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {
+			"version": "latest"
+		},
+		"ghcr.io/devcontainers/features/github-cli:1": {
+			"version": "latest"
+		}
+	},
+
+	// Use 'forwardPorts' to make a list of ports inside the container available locally
+	"forwardPorts": [],
+
+	// Use 'postCreateCommand' to run commands after the container is created
+	"postCreateCommand": "cd homelab-setup && go mod download && go install golang.org/x/tools/gopls@latest && go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest",
+
+	// Comment out to connect as root instead
+	"remoteUser": "vscode"
+
+	// Note: Environment variables, mounts, and runtime args are configured in docker-compose.yml
+	// If using Dockerfile directly, uncomment the sections below:
+	//
+	// "remoteEnv": {
+	// 	"CGO_ENABLED": "0",
+	// 	"GOOS": "linux",
+	// 	"GOARCH": "amd64"
+	// },
+	// "runArgs": [
+	// 	"--cap-add=SYS_PTRACE",
+	// 	"--security-opt",
+	// 	"seccomp=unconfined"
+	// ],
+	// "mounts": [
+	// 	"source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+	// ]
+}
