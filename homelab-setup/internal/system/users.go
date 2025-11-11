@@ -138,7 +138,7 @@ func (um *UserManager) CreateUser(username string, createHome bool) error {
 
 	args = append(args, username)
 
-	cmd := exec.Command("sudo", args...)
+	cmd := exec.Command("sudo", append([]string{"-n"}, args...)...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to create user %s: %w\nOutput: %s", username, err, string(output))
@@ -157,7 +157,7 @@ func (um *UserManager) DeleteUser(username string, removeHome bool) error {
 
 	args = append(args, username)
 
-	cmd := exec.Command("sudo", args...)
+	cmd := exec.Command("sudo", append([]string{"-n"}, args...)...)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to delete user %s: %w\nOutput: %s", username, err, string(output))
@@ -168,7 +168,7 @@ func (um *UserManager) DeleteUser(username string, removeHome bool) error {
 
 // AddUserToGroup adds a user to a group
 func (um *UserManager) AddUserToGroup(username, groupName string) error {
-	cmd := exec.Command("sudo", "usermod", "-aG", groupName, username)
+	cmd := exec.Command("sudo", "-n", "usermod", "-aG", groupName, username)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to add user %s to group %s: %w\nOutput: %s", username, groupName, err, string(output))
@@ -179,7 +179,7 @@ func (um *UserManager) AddUserToGroup(username, groupName string) error {
 
 // SetUserShell sets the login shell for a user
 func (um *UserManager) SetUserShell(username, shell string) error {
-	cmd := exec.Command("sudo", "usermod", "-s", shell, username)
+	cmd := exec.Command("sudo", "-n", "usermod", "-s", shell, username)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("failed to set shell for user %s: %w\nOutput: %s", username, err, string(output))
