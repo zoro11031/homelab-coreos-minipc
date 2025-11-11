@@ -50,12 +50,6 @@ count_yaml_files() {
 }
 
 # Helper function to check if directory has YAML files
-has_yaml_files() {
-    local dir="$1"
-    local count
-    count=$(count_yaml_files "$dir")
-    [[ $count -gt 0 ]]
-}
 
 find_compose_templates() {
     log_step "Locating Compose Templates"
