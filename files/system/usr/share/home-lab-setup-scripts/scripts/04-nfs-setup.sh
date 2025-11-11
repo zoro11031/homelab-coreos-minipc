@@ -121,9 +121,11 @@ cleanup_old_mount_unit() {
         done
     done
 
-    # Reload systemd if we cleaned anything to ensure internal state is updated
+    # Return whether anything was cleaned (caller will handle daemon-reload)
     if [[ "$cleaned" == true ]]; then
-        sudo systemctl daemon-reload
+        return 0
+    else
+        return 1
     fi
 }
 
