@@ -58,40 +58,73 @@ func (p *PreflightChecker) CheckRpmOstree() error {
 
 // CheckRequiredPackages verifies all required packages are installed
 func (p *PreflightChecker) CheckRequiredPackages() error {
-	p.ui.Info("Checking required packages...")
+	p.ui.Info("Checking packages...")
 
-	requiredPackages := []string{
-		"nfs-utils",
-		"wireguard-tools",
+	// Core packages that are always needed
+	corePackages := []string{}
+
+	// Optional packages (for optional setup steps)
+	optionalPackages := []string{
+		"nfs-utils",       // Optional: for NFS setup
+		"wireguard-tools", // Optional: for WireGuard VPN setup
 	}
 
-	results, err := p.packages.CheckMultiple(requiredPackages)
-	if err != nil {
-		return fmt.Errorf("failed to check packages: %w", err)
+	// Check core packages (none currently required)
+	if len(corePackages) > 0 {
+		results, err := p.packages.CheckMultiple(corePackages)
+		if err != nil {
+			return fmt.Errorf("failed to check packages: %w", err)
+		}
+
+		missingPackages := []string{}
+		for _, pkg := range corePackages {
+			if results[pkg] {
+				p.ui.Successf("  ✓ %s is installed", pkg)
+			} else {
+				p.ui.Errorf("  ✗ %s is NOT installed", pkg)
+				missingPackages = append(missingPackages, pkg)
+			}
+		}
+
+		if len(missingPackages) > 0 {
+			p.ui.Error("Missing required packages")
+			p.ui.Info("To install them, run:")
+			for _, pkg := range missingPackages {
+				p.ui.Infof("  sudo rpm-ostree install %s", pkg)
+			}
+			p.ui.Info("Then reboot the system:")
+			p.ui.Info("  sudo systemctl reboot")
+			return fmt.Errorf("missing required packages: %v", missingPackages)
+		}
 	}
 
-	missingPackages := []string{}
-	for _, pkg := range requiredPackages {
-		if results[pkg] {
-			p.ui.Successf("  ✓ %s is installed", pkg)
+	// Check optional packages (warnings only)
+	if len(optionalPackages) > 0 {
+		p.ui.Info("Checking optional packages...")
+		results, err := p.packages.CheckMultiple(optionalPackages)
+		if err != nil {
+			p.ui.Warning(fmt.Sprintf("Failed to check optional packages: %v", err))
 		} else {
-			p.ui.Errorf("  ✗ %s is NOT installed", pkg)
-			missingPackages = append(missingPackages, pkg)
+			missingOptional := []string{}
+			for _, pkg := range optionalPackages {
+				if results[pkg] {
+					p.ui.Successf("  ✓ %s is installed", pkg)
+				} else {
+					p.ui.Infof("  - %s is not installed (optional)", pkg)
+					missingOptional = append(missingOptional, pkg)
+				}
+			}
+
+			if len(missingOptional) > 0 {
+				p.ui.Info("Optional packages can be installed later if needed:")
+				for _, pkg := range missingOptional {
+					p.ui.Infof("  sudo rpm-ostree install %s", pkg)
+				}
+			}
 		}
 	}
 
-	if len(missingPackages) > 0 {
-		p.ui.Error("Missing required packages")
-		p.ui.Info("To install them, run:")
-		for _, pkg := range missingPackages {
-			p.ui.Infof("  sudo rpm-ostree install %s", pkg)
-		}
-		p.ui.Info("Then reboot the system:")
-		p.ui.Info("  sudo systemctl reboot")
-		return fmt.Errorf("missing required packages: %v", missingPackages)
-	}
-
-	p.ui.Success("All required packages are installed")
+	p.ui.Success("Package check completed")
 	return nil
 }
 

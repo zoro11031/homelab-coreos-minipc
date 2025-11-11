@@ -187,15 +187,10 @@ func (u *UserConfigurator) ConfigureSubuidSubgid(username string) error {
 
 // SetupShell optionally sets the user's shell
 func (u *UserConfigurator) SetupShell(username string) error {
-	// Get user info to check current shell
-	userInfo, err := u.users.GetUserInfo(username)
-	if err != nil {
-		return fmt.Errorf("failed to get user info: %w", err)
-	}
+	// Note: os/user.User struct doesn't include shell information
+	// Would need to parse /etc/passwd or use getent to get current shell
 
-	u.ui.Infof("Current shell: %s", userInfo.HomeDir)
-
-	// Ask if they want to change shell
+	// Ask if they want to set the shell
 	changeShell, err := u.ui.PromptYesNo("Would you like to change the shell?", false)
 	if err != nil {
 		return fmt.Errorf("failed to prompt for shell change: %w", err)
