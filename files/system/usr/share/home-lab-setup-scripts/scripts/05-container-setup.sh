@@ -46,24 +46,49 @@ declare -a SELECTED_SERVICES=()
 find_compose_templates() {
     log_step "Locating Compose Templates"
 
+    # Helper function to check if directory has YAML files
+    has_yaml_files() {
+        local dir="$1"
+        local count
+        count=$(find "$dir" -maxdepth 1 -type f \( -name "*.yml" -o -name "*.yaml" \) 2>/dev/null | wc -l)
+        [[ $count -gt 0 ]]
+    }
+
     # Check home setup directory first
     if [[ -d "$TEMPLATE_DIR_HOME" ]]; then
-        log_success "Found templates in: $TEMPLATE_DIR_HOME"
-        echo "$TEMPLATE_DIR_HOME"
-        return 0
+        log_info "Checking: $TEMPLATE_DIR_HOME"
+        if has_yaml_files "$TEMPLATE_DIR_HOME"; then
+            local yaml_count
+            yaml_count=$(find "$TEMPLATE_DIR_HOME" -maxdepth 1 -type f \( -name "*.yml" -o -name "*.yaml" \) 2>/dev/null | wc -l)
+            log_success "Found templates in: $TEMPLATE_DIR_HOME ($yaml_count YAML file(s))"
+            echo "$TEMPLATE_DIR_HOME"
+            return 0
+        else
+            log_warning "Directory exists but contains no YAML files: $TEMPLATE_DIR_HOME"
+            log_info "Checking fallback location..."
+        fi
     fi
 
     # Check /usr/share as fallback
     if [[ -d "$TEMPLATE_DIR_USR" ]]; then
-        log_success "Found templates in: $TEMPLATE_DIR_USR"
-        echo "$TEMPLATE_DIR_USR"
-        return 0
+        log_info "Checking: $TEMPLATE_DIR_USR"
+        if has_yaml_files "$TEMPLATE_DIR_USR"; then
+            local yaml_count
+            yaml_count=$(find "$TEMPLATE_DIR_USR" -maxdepth 1 -type f \( -name "*.yml" -o -name "*.yaml" \) 2>/dev/null | wc -l)
+            log_success "Found templates in: $TEMPLATE_DIR_USR ($yaml_count YAML file(s))"
+            echo "$TEMPLATE_DIR_USR"
+            return 0
+        else
+            log_warning "Directory exists but contains no YAML files: $TEMPLATE_DIR_USR"
+        fi
     fi
 
-    log_error "Compose templates not found"
-    log_info "Expected locations:"
+    log_error "No compose templates found in any location"
+    log_info "Searched locations:"
     log_info "  - $TEMPLATE_DIR_HOME"
     log_info "  - $TEMPLATE_DIR_USR"
+    log_info ""
+    log_info "Expected to find .yml or .yaml files in one of these directories"
     return 1
 }
 
@@ -75,26 +100,37 @@ discover_available_stacks() {
     # Clear existing services
     SERVICES=()
 
+    log_info "Scanning directory: $template_dir"
+
+    # Count total YAML files before filtering
+    local total_yaml_count
+    total_yaml_count=$(find "$template_dir" -maxdepth 1 -type f \( -name "*.yml" -o -name "*.yaml" \) 2>/dev/null | wc -l)
+    log_info "Found $total_yaml_count total YAML file(s) in directory"
+
     # Find all .yml and .yaml files in the template directory
     local count=0
+    local excluded_count=0
     while IFS= read -r -d '' yaml_file; do
         local filename
         filename=$(basename "$yaml_file")
 
         # Check if filename matches any exclude pattern
         local should_exclude=false
+        local matched_pattern=""
         for pattern in "${EXCLUDE_PATTERNS[@]}"; do
             # shellcheck disable=SC2053
             if [[ "$filename" == $pattern ]]; then
                 should_exclude=true
+                matched_pattern="$pattern"
                 break
             fi
         done
 
         if $should_exclude; then
+            log_info "Excluding: $filename (matches pattern: $matched_pattern)"
+            ((excluded_count++))
             continue
         fi
-        # Skip known non-stack files (env.example.yml, README.yml, etc.)
 
         # Get service name (filename without extension)
         local service_name="${filename%.yml}"
@@ -107,11 +143,22 @@ discover_available_stacks() {
     done < <(find "$template_dir" -maxdepth 1 -type f \( -name "*.yml" -o -name "*.yaml" \) -print0 2>/dev/null)
 
     if [[ $count -eq 0 ]]; then
-        log_error "No compose YAML files found in $template_dir"
+        log_error "No valid compose stack files discovered"
+        log_error "Directory checked: $template_dir"
+        log_info "Total YAML files found: $total_yaml_count"
+        log_info "Files excluded by patterns: $excluded_count"
+        log_info ""
+        log_info "Exclude patterns:"
+        for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+            log_info "  - $pattern"
+        done
+        log_info ""
+        log_info "Stack files should be named like: media.yml, web.yml, cloud.yml"
+        log_info "Excluded files: .env.example, README.md, .hidden files"
         return 1
     fi
 
-    log_success "Discovered $count container stack(s)"
+    log_success "Discovered $count valid container stack(s) (excluded $excluded_count file(s))"
     return 0
 }
 
@@ -711,13 +758,24 @@ main() {
     # Find templates
     local template_dir
     if ! template_dir=$(find_compose_templates); then
-        log_error "Cannot proceed without templates"
+        log_error "Cannot proceed without compose templates"
+        log_info ""
+        log_info "Troubleshooting tips:"
+        log_info "  1. Ensure templates are in ~/setup/compose-setup/ or /usr/share/compose-setup/"
+        log_info "  2. Templates should be .yml or .yaml files (e.g., media.yml, web.yml)"
+        log_info "  3. Check that the template files are readable"
         exit 1
     fi
 
     # Discover available stacks
     if ! discover_available_stacks "$template_dir"; then
         log_error "Failed to discover container stacks"
+        log_info ""
+        log_info "Troubleshooting tips:"
+        log_info "  1. Check if the template directory contains .yml/.yaml files"
+        log_info "  2. Ensure files are not excluded by patterns (.example, .*, README*, *.md)"
+        log_info "  3. Verify file permissions allow reading the template files"
+        log_info "  4. Look for errors in the detailed output above"
         exit 1
     fi
 
