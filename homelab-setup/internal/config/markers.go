@@ -44,10 +44,19 @@ func (m *Markers) Create(name string) error {
 }
 
 // Exists checks if a marker file exists
-func (m *Markers) Exists(name string) bool {
+// Returns (exists, error) where error indicates a problem checking (e.g., permission denied)
+// If error is not nil, the exists value should not be trusted
+func (m *Markers) Exists(name string) (bool, error) {
 	markerPath := filepath.Join(m.dir, name)
 	_, err := os.Stat(markerPath)
-	return err == nil
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	// Other error (permission denied, I/O error, etc.)
+	return false, fmt.Errorf("failed to check marker existence: %w", err)
 }
 
 // Remove deletes a marker file

@@ -12,6 +12,7 @@ import (
 type Config struct {
 	filePath string
 	data     map[string]string
+	loaded   bool // Track if configuration has been loaded from disk
 }
 
 // New creates a new Config instance
@@ -34,6 +35,7 @@ func New(filePath string) *Config {
 func (c *Config) Load() error {
 	// If file doesn't exist, that's okay - we'll create it on Save
 	if _, err := os.Stat(c.filePath); os.IsNotExist(err) {
+		c.loaded = true
 		return nil
 	}
 
@@ -61,7 +63,12 @@ func (c *Config) Load() error {
 		}
 	}
 
-	return scanner.Err()
+	if err := scanner.Err(); err != nil {
+		return err
+	}
+
+	c.loaded = true
+	return nil
 }
 
 // Save writes configuration to file
@@ -76,7 +83,6 @@ func (c *Config) Save() error {
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)
 	}
-	defer file.Close()
 
 	// Write header
 	fmt.Fprintln(file, "# UBlue uCore Homelab Setup Configuration")
@@ -86,6 +92,11 @@ func (c *Config) Save() error {
 	// Write key-value pairs
 	for key, value := range c.data {
 		fmt.Fprintf(file, "%s=%s\n", key, value)
+	}
+
+	// Explicitly check close error to prevent data loss
+	if err := file.Close(); err != nil {
+		return fmt.Errorf("failed to close config file: %w", err)
 	}
 
 	return nil
@@ -109,7 +120,15 @@ func (c *Config) GetOrDefault(key, defaultValue string) string {
 }
 
 // Set sets a configuration value
+// Automatically loads existing configuration if not already loaded to prevent data loss
 func (c *Config) Set(key, value string) error {
+	// Load existing configuration first to avoid overwriting
+	if !c.loaded {
+		if err := c.Load(); err != nil {
+			return fmt.Errorf("failed to load existing config before set: %w", err)
+		}
+	}
+
 	c.data[key] = value
 	return c.Save()
 }
@@ -131,7 +150,15 @@ func (c *Config) GetAll() map[string]string {
 }
 
 // Delete removes a configuration key
+// Automatically loads existing configuration if not already loaded to prevent data loss
 func (c *Config) Delete(key string) error {
+	// Load existing configuration first to avoid overwriting
+	if !c.loaded {
+		if err := c.Load(); err != nil {
+			return fmt.Errorf("failed to load existing config before delete: %w", err)
+		}
+	}
+
 	delete(c.data, key)
 	return c.Save()
 }

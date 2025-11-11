@@ -101,13 +101,17 @@ func (u *UI) PromptMultiSelect(prompt string, options []string) ([]int, error) {
 	}
 
 	// Find indices of selected options
+	// Create a map of selected options for O(1) lookup
+	selectedMap := make(map[string]bool, len(selected))
+	for _, sel := range selected {
+		selectedMap[sel] = true
+	}
+
+	// Single pass through options to find indices - O(n) instead of O(n*m)
 	var indices []int
 	for i, opt := range options {
-		for _, sel := range selected {
-			if opt == sel {
-				indices = append(indices, i)
-				break
-			}
+		if selectedMap[opt] {
+			indices = append(indices, i)
 		}
 	}
 
