@@ -403,7 +403,7 @@ configure_generic_env() {
     log_step "Configuring ${service^} Stack Environment"
 
     log_info "No specific configuration prompts for this stack."
-    log_info "Creating basic environment file with default settings."
+    log_info "Creating environment file with base configuration (PUID, PGID, timezone)."
 
     # Create env file with just base configuration
     create_env_file "$env_file" "$service"
