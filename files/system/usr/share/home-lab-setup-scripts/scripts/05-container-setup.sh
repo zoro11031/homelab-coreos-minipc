@@ -63,9 +63,9 @@ find_compose_templates() {
     # Check home setup directory first
     if [[ -d "$TEMPLATE_DIR_HOME" ]]; then
         log_info "Checking: $TEMPLATE_DIR_HOME"
-        if has_yaml_files "$TEMPLATE_DIR_HOME"; then
-            local yaml_count
-            yaml_count=$(count_yaml_files "$TEMPLATE_DIR_HOME")
+        local yaml_count
+        yaml_count=$(count_yaml_files "$TEMPLATE_DIR_HOME")
+        if [[ $yaml_count -gt 0 ]]; then
             log_success "Found templates in: $TEMPLATE_DIR_HOME ($yaml_count YAML file(s))"
             echo "$TEMPLATE_DIR_HOME"
             return 0
@@ -78,9 +78,9 @@ find_compose_templates() {
     # Check /usr/share as fallback
     if [[ -d "$TEMPLATE_DIR_USR" ]]; then
         log_info "Checking: $TEMPLATE_DIR_USR"
-        if has_yaml_files "$TEMPLATE_DIR_USR"; then
-            local yaml_count
-            yaml_count=$(count_yaml_files "$TEMPLATE_DIR_USR")
+        local yaml_count
+        yaml_count=$(count_yaml_files "$TEMPLATE_DIR_USR")
+        if [[ $yaml_count -gt 0 ]]; then
             log_success "Found templates in: $TEMPLATE_DIR_USR ($yaml_count YAML file(s))"
             echo "$TEMPLATE_DIR_USR"
             return 0
@@ -587,8 +587,16 @@ EOF
     # Set proper ownership
     local setup_user
     setup_user=$(load_config "SETUP_USER")
-    sudo chown "${setup_user}:${setup_user}" "$env_file"
-    sudo chmod 600 "$env_file"
+
+    if ! sudo chown "${setup_user}:${setup_user}" "$env_file"; then
+        log_error "Failed to set ownership on: $env_file"
+        return 1
+    fi
+
+    if ! sudo chmod 600 "$env_file"; then
+        log_error "Failed to set permissions on: $env_file"
+        return 1
+    fi
 
     log_success "Created: $env_file"
 }
