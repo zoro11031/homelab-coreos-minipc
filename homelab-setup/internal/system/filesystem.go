@@ -32,7 +32,7 @@ func (fs *FileSystem) EnsureDirectory(path string, owner string, perms os.FileMo
 	}
 
 	// Create directory with sudo
-	cmd := exec.Command("sudo", "mkdir", "-p", path)
+	cmd := exec.Command("sudo", "-n", "mkdir", "-p", path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w\nOutput: %s", path, err, string(output))
 	}
@@ -55,7 +55,7 @@ func (fs *FileSystem) EnsureDirectory(path string, owner string, perms os.FileMo
 // Chown changes the owner of a file or directory
 // owner should be in format "user:group" or just "user"
 func (fs *FileSystem) Chown(path string, owner string) error {
-	cmd := exec.Command("sudo", "chown", owner, path)
+	cmd := exec.Command("sudo", "-n", "chown", owner, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to chown %s to %s: %w\nOutput: %s", path, owner, err, string(output))
 	}
@@ -64,7 +64,7 @@ func (fs *FileSystem) Chown(path string, owner string) error {
 
 // ChownRecursive changes the owner of a file or directory recursively
 func (fs *FileSystem) ChownRecursive(path string, owner string) error {
-	cmd := exec.Command("sudo", "chown", "-R", owner, path)
+	cmd := exec.Command("sudo", "-n", "chown", "-R", owner, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to chown -R %s to %s: %w\nOutput: %s", path, owner, err, string(output))
 	}
@@ -74,7 +74,7 @@ func (fs *FileSystem) ChownRecursive(path string, owner string) error {
 // Chmod changes the permissions of a file or directory
 func (fs *FileSystem) Chmod(path string, perms os.FileMode) error {
 	permStr := fmt.Sprintf("%o", perms)
-	cmd := exec.Command("sudo", "chmod", permStr, path)
+	cmd := exec.Command("sudo", "-n", "chmod", permStr, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to chmod %s to %s: %w\nOutput: %s", path, permStr, err, string(output))
 	}
@@ -84,7 +84,7 @@ func (fs *FileSystem) Chmod(path string, perms os.FileMode) error {
 // ChmodRecursive changes permissions recursively
 func (fs *FileSystem) ChmodRecursive(path string, perms os.FileMode) error {
 	permStr := fmt.Sprintf("%o", perms)
-	cmd := exec.Command("sudo", "chmod", "-R", permStr, path)
+	cmd := exec.Command("sudo", "-n", "chmod", "-R", permStr, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to chmod -R %s to %s: %w\nOutput: %s", path, permStr, err, string(output))
 	}
@@ -187,7 +187,7 @@ func (fs *FileSystem) RemoveDirectory(path string) error {
 		}
 	}
 
-	cmd := exec.Command("sudo", "rm", "-rf", path)
+	cmd := exec.Command("sudo", "-n", "rm", "-rf", path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to remove directory %s: %w\nOutput: %s", path, err, string(output))
 	}
@@ -196,7 +196,7 @@ func (fs *FileSystem) RemoveDirectory(path string) error {
 
 // RemoveFile removes a file
 func (fs *FileSystem) RemoveFile(path string) error {
-	cmd := exec.Command("sudo", "rm", "-f", path)
+	cmd := exec.Command("sudo", "-n", "rm", "-f", path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to remove file %s: %w\nOutput: %s", path, err, string(output))
 	}
@@ -205,7 +205,7 @@ func (fs *FileSystem) RemoveFile(path string) error {
 
 // CopyFile copies a file from src to dst
 func (fs *FileSystem) CopyFile(src, dst string) error {
-	cmd := exec.Command("sudo", "cp", src, dst)
+	cmd := exec.Command("sudo", "-n", "cp", src, dst)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to copy %s to %s: %w\nOutput: %s", src, dst, err, string(output))
 	}
@@ -303,7 +303,7 @@ func (fs *FileSystem) ListDirectory(path string) ([]string, error) {
 
 // CreateSymlink creates a symbolic link
 func (fs *FileSystem) CreateSymlink(target, linkPath string) error {
-	cmd := exec.Command("sudo", "ln", "-sf", target, linkPath)
+	cmd := exec.Command("sudo", "-n", "ln", "-sf", target, linkPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create symlink %s -> %s: %w\nOutput: %s", linkPath, target, err, string(output))
 	}
@@ -328,7 +328,7 @@ func (fs *FileSystem) WriteFile(path string, content []byte, perms os.FileMode) 
 	tmpFile.Close()
 
 	// Move temp file to target with sudo
-	cmd := exec.Command("sudo", "mv", tmpPath, path)
+	cmd := exec.Command("sudo", "-n", "mv", tmpPath, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to move file to %s: %w\nOutput: %s", path, err, string(output))
 	}
