@@ -287,26 +287,18 @@ func (w *WireGuardSetup) DisplayPeerInstructions(interfaceName, publicKey string
 	w.ui.Print("")
 }
 
+const wireGuardCompletionMarker = "wireguard-setup-complete"
+
 // Run executes the WireGuard setup step
 func (w *WireGuardSetup) Run() error {
-	// Check if already completed or skipped
-	exists, err := w.markers.Exists("wireguard-configured")
+	// Check if already completed (and migrate legacy markers)
+	completed, err := ensureCanonicalMarker(w.markers, wireGuardCompletionMarker, "wireguard-configured", "wireguard-skipped")
 	if err != nil {
 		return fmt.Errorf("failed to check marker: %w", err)
 	}
-	if exists {
+	if completed {
 		w.ui.Info("WireGuard already configured (marker found)")
-		w.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/wireguard-configured")
-		return nil
-	}
-
-	skipped, err := w.markers.Exists("wireguard-skipped")
-	if err != nil {
-		return fmt.Errorf("failed to check marker: %w", err)
-	}
-	if skipped {
-		w.ui.Info("WireGuard setup was previously skipped")
-		w.ui.Info("To configure WireGuard, remove marker: ~/.local/homelab-setup/wireguard-skipped")
+		w.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/" + wireGuardCompletionMarker)
 		return nil
 	}
 
@@ -323,8 +315,12 @@ func (w *WireGuardSetup) Run() error {
 
 	if !useWireGuard {
 		w.ui.Info("Skipping WireGuard configuration")
-		if err := w.markers.Create("wireguard-skipped"); err != nil {
-			return fmt.Errorf("failed to create skip marker: %w", err)
+		w.ui.Info("To configure WireGuard later, remove marker: ~/.local/homelab-setup/" + wireGuardCompletionMarker)
+		if err := w.config.Set("WIREGUARD_ENABLED", "false"); err != nil {
+			return fmt.Errorf("failed to update WireGuard configuration: %w", err)
+		}
+		if err := w.markers.Create(wireGuardCompletionMarker); err != nil {
+			return fmt.Errorf("failed to create completion marker: %w", err)
 		}
 		return nil
 	}
@@ -389,7 +385,7 @@ func (w *WireGuardSetup) Run() error {
 	w.ui.Infof("Port: %s", cfg.ListenPort)
 
 	// Create completion marker
-	if err := w.markers.Create("wireguard-configured"); err != nil {
+	if err := w.markers.Create(wireGuardCompletionMarker); err != nil {
 		return fmt.Errorf("failed to create completion marker: %w", err)
 	}
 

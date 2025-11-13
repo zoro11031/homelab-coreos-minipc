@@ -306,9 +306,9 @@ func (d *Deployment) DisplayAccessInfo() {
 			"Homepage":  "3000",
 		},
 		"cloud": {
-			"Nextcloud":  "8080",
-			"Collabora":  "9980",
-			"Immich":     "2283",
+			"Nextcloud": "8080",
+			"Collabora": "9980",
+			"Immich":    "2283",
 		},
 	}
 
@@ -413,16 +413,18 @@ func (d *Deployment) DeployService(serviceName string) error {
 	return nil
 }
 
+const deploymentCompletionMarker = "service-deployment-complete"
+
 // Run executes the deployment step
 func (d *Deployment) Run() error {
-	// Check if already completed
-	exists, err := d.markers.Exists("deployment-complete")
+	// Check if already completed (and migrate legacy markers)
+	completed, err := ensureCanonicalMarker(d.markers, deploymentCompletionMarker, "deployment-complete")
 	if err != nil {
 		return fmt.Errorf("failed to check marker: %w", err)
 	}
-	if exists {
+	if completed {
 		d.ui.Info("Service deployment already completed (marker found)")
-		d.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/deployment-complete")
+		d.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/" + deploymentCompletionMarker)
 		return nil
 	}
 
@@ -460,7 +462,7 @@ func (d *Deployment) Run() error {
 	d.ui.Infof("Deployed %d stack(s)", len(selectedServices))
 
 	// Create completion marker
-	if err := d.markers.Create("deployment-complete"); err != nil {
+	if err := d.markers.Create(deploymentCompletionMarker); err != nil {
 		return fmt.Errorf("failed to create completion marker: %w", err)
 	}
 

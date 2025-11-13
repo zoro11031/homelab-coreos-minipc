@@ -241,26 +241,18 @@ func (n *NFSConfigurator) MountNFS(mountPoint string) error {
 	return nil
 }
 
+const nfsCompletionMarker = "nfs-setup-complete"
+
 // Run executes the NFS configuration step
 func (n *NFSConfigurator) Run() error {
-	// Check if already completed or skipped
-	exists, err := n.markers.Exists("nfs-configured")
+	// Check if already completed (and migrate legacy markers)
+	completed, err := ensureCanonicalMarker(n.markers, nfsCompletionMarker, "nfs-configured", "nfs-skipped")
 	if err != nil {
 		return fmt.Errorf("failed to check marker: %w", err)
 	}
-	if exists {
+	if completed {
 		n.ui.Info("NFS already configured (marker found)")
-		n.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/nfs-configured")
-		return nil
-	}
-
-	skipped, err := n.markers.Exists("nfs-skipped")
-	if err != nil {
-		return fmt.Errorf("failed to check marker: %w", err)
-	}
-	if skipped {
-		n.ui.Info("NFS setup was previously skipped")
-		n.ui.Info("To configure NFS, remove marker: ~/.local/homelab-setup/nfs-skipped")
+		n.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/" + nfsCompletionMarker)
 		return nil
 	}
 
@@ -277,8 +269,9 @@ func (n *NFSConfigurator) Run() error {
 
 	if !useNFS {
 		n.ui.Info("Skipping NFS configuration")
-		if err := n.markers.Create("nfs-skipped"); err != nil {
-			return fmt.Errorf("failed to create skip marker: %w", err)
+		n.ui.Info("To configure NFS later, remove marker: ~/.local/homelab-setup/" + nfsCompletionMarker)
+		if err := n.markers.Create(nfsCompletionMarker); err != nil {
+			return fmt.Errorf("failed to create completion marker: %w", err)
 		}
 		return nil
 	}
@@ -345,7 +338,7 @@ func (n *NFSConfigurator) Run() error {
 	n.ui.Infof("Mount Point: %s", mountPoint)
 
 	// Create completion marker
-	if err := n.markers.Create("nfs-configured"); err != nil {
+	if err := n.markers.Create(nfsCompletionMarker); err != nil {
 		return fmt.Errorf("failed to create completion marker: %w", err)
 	}
 

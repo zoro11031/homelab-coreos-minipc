@@ -220,16 +220,18 @@ func (d *DirectorySetup) DisplayStructure(baseDir string) error {
 	return nil
 }
 
+const directoryCompletionMarker = "directory-setup-complete"
+
 // Run executes the directory setup step
 func (d *DirectorySetup) Run() error {
-	// Check if already completed
-	exists, err := d.markers.Exists("directories-created")
+	// Check if already completed (and migrate legacy markers)
+	completed, err := ensureCanonicalMarker(d.markers, directoryCompletionMarker, "directories-created")
 	if err != nil {
 		return fmt.Errorf("failed to check marker: %w", err)
 	}
-	if exists {
+	if completed {
 		d.ui.Info("Directory structure already created (marker found)")
-		d.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/directories-created")
+		d.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/" + directoryCompletionMarker)
 		return nil
 	}
 
@@ -332,7 +334,7 @@ func (d *DirectorySetup) Run() error {
 	d.ui.Infof("Base directory: %s", baseDir)
 
 	// Create completion marker
-	if err := d.markers.Create("directories-created"); err != nil {
+	if err := d.markers.Create(directoryCompletionMarker); err != nil {
 		return fmt.Errorf("failed to create completion marker: %w", err)
 	}
 

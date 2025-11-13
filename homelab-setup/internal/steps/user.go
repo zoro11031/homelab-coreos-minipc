@@ -242,16 +242,18 @@ func (u *UserConfigurator) GetTimezoneInfo() error {
 	return nil
 }
 
+const userCompletionMarker = "user-setup-complete"
+
 // Run executes the user configuration step
 func (u *UserConfigurator) Run() error {
-	// Check if already completed
-	exists, err := u.markers.Exists("user-configured")
+	// Check if already completed (and migrate legacy markers)
+	completed, err := ensureCanonicalMarker(u.markers, userCompletionMarker, "user-configured")
 	if err != nil {
 		return fmt.Errorf("failed to check marker: %w", err)
 	}
-	if exists {
+	if completed {
 		u.ui.Info("User configuration already completed (marker found)")
-		u.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/user-configured")
+		u.ui.Info("To re-run, remove marker: ~/.local/homelab-setup/" + userCompletionMarker)
 		return nil
 	}
 
@@ -330,7 +332,7 @@ func (u *UserConfigurator) Run() error {
 	u.ui.Infof("Homelab user: %s (UID: %d, GID: %d)", username, uid, gid)
 
 	// Create completion marker
-	if err := u.markers.Create("user-configured"); err != nil {
+	if err := u.markers.Create(userCompletionMarker); err != nil {
 		return fmt.Errorf("failed to create completion marker: %w", err)
 	}
 
