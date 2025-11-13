@@ -200,11 +200,19 @@ Configuration is stored in `~/.homelab-setup.conf` (same format as bash version)
 ```ini
 CONTAINER_RUNTIME=podman
 SETUP_USER=containeruser
+HOMELAB_USER=containeruser
 PUID=1001
 PGID=1001
 TZ=America/Chicago
 NFS_SERVER=192.168.7.10
 ```
+
+### Preseeding the homelab user
+
+- `HOMELAB_USER` &mdash; primary user that services should run as. When set, the user step reuses this value and skips the interactive prompt after validating it.
+- `SETUP_USER` &mdash; legacy key used by the original shell scripts. Passing `--setup-user <name>` to `homelab-setup run --non-interactive` or writing this key in the config automatically seeds `HOMELAB_USER` before the user step executes.
+
+Both keys are validated before use. Invalid values trigger a warning and fall back to the interactive prompt, ensuring unattended automation can safely preseed the username.
 
 Completion markers are stored in `~/.local/homelab-setup/`:
 

@@ -2,6 +2,7 @@ package steps
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/common"
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
@@ -50,6 +51,37 @@ func (u *UserConfigurator) PromptForUser() (string, error) {
 	}
 
 	return username, nil
+}
+
+// getConfiguredUsername returns a validated username from existing configuration.
+// It prefers HOMELAB_USER and falls back to SETUP_USER for backwards compatibility.
+func (u *UserConfigurator) getConfiguredUsername() (string, error) {
+	configKeys := []string{"HOMELAB_USER", "SETUP_USER"}
+
+	for _, key := range configKeys {
+		value := strings.TrimSpace(u.config.GetOrDefault(key, ""))
+		if value == "" {
+			continue
+		}
+
+		if err := common.ValidateUsername(value); err != nil {
+			u.ui.Warningf("Ignoring %s=%s: %v", key, value, err)
+			continue
+		}
+
+		if key == "HOMELAB_USER" {
+			u.ui.Infof("Using pre-configured homelab user: %s", value)
+			return value, nil
+		}
+
+		u.ui.Infof("Using SETUP_USER (%s) for homelab user", value)
+		if err := u.config.Set("HOMELAB_USER", value); err != nil {
+			return "", fmt.Errorf("failed to persist HOMELAB_USER: %w", err)
+		}
+		return value, nil
+	}
+
+	return "", nil
 }
 
 // ValidateUser checks if a user exists and can be used for homelab
@@ -261,9 +293,16 @@ func (u *UserConfigurator) Run() error {
 
 	// Prompt for username
 	u.ui.Step("Select Homelab User")
-	username, err := u.PromptForUser()
+	username, err := u.getConfiguredUsername()
 	if err != nil {
-		return fmt.Errorf("failed to get username: %w", err)
+		return fmt.Errorf("failed to read configured username: %w", err)
+	}
+
+	if username == "" {
+		username, err = u.PromptForUser()
+		if err != nil {
+			return fmt.Errorf("failed to get username: %w", err)
+		}
 	}
 
 	// Validate or create user
