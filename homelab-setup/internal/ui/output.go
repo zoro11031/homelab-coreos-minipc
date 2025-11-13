@@ -11,7 +11,8 @@ import (
 
 // UI provides user interface methods
 type UI struct {
-	output io.Writer
+	output         io.Writer
+	nonInteractive bool // If true, don't prompt user for input
 	// Color functions
 	colorInfo    *color.Color
 	colorSuccess *color.Color
@@ -24,14 +25,25 @@ type UI struct {
 // New creates a new UI instance
 func New() *UI {
 	return &UI{
-		output:       os.Stderr,
-		colorInfo:    color.New(color.FgBlue),
-		colorSuccess: color.New(color.FgGreen),
-		colorWarning: color.New(color.FgYellow),
-		colorError:   color.New(color.FgRed),
-		colorBold:    color.New(color.Bold),
-		colorCyan:    color.New(color.FgCyan, color.Bold),
+		output:         os.Stderr,
+		nonInteractive: false,
+		colorInfo:      color.New(color.FgBlue),
+		colorSuccess:   color.New(color.FgGreen),
+		colorWarning:   color.New(color.FgYellow),
+		colorError:     color.New(color.FgRed),
+		colorBold:      color.New(color.Bold),
+		colorCyan:      color.New(color.FgCyan, color.Bold),
 	}
+}
+
+// SetNonInteractive enables or disables non-interactive mode
+func (u *UI) SetNonInteractive(enabled bool) {
+	u.nonInteractive = enabled
+}
+
+// IsNonInteractive returns true if non-interactive mode is enabled
+func (u *UI) IsNonInteractive() bool {
+	return u.nonInteractive
 }
 
 // NewWithWriter creates a UI with custom output writer (useful for testing)

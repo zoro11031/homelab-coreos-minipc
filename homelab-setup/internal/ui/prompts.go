@@ -8,6 +8,12 @@ import (
 
 // PromptYesNo prompts the user for a yes/no answer
 func (u *UI) PromptYesNo(prompt string, defaultYes bool) (bool, error) {
+	// In non-interactive mode, return the default
+	if u.nonInteractive {
+		u.Infof("[Non-interactive] %s -> %v (default)", prompt, defaultYes)
+		return defaultYes, nil
+	}
+
 	var result bool
 	p := &survey.Confirm{
 		Message: prompt,
@@ -20,6 +26,15 @@ func (u *UI) PromptYesNo(prompt string, defaultYes bool) (bool, error) {
 
 // PromptInput prompts the user for text input
 func (u *UI) PromptInput(prompt, defaultValue string) (string, error) {
+	// In non-interactive mode, return the default or error if no default
+	if u.nonInteractive {
+		if defaultValue == "" {
+			return "", fmt.Errorf("non-interactive mode requires a default value for: %s", prompt)
+		}
+		u.Infof("[Non-interactive] %s -> %s (default)", prompt, defaultValue)
+		return defaultValue, nil
+	}
+
 	var result string
 	p := &survey.Input{
 		Message: prompt,
@@ -32,6 +47,11 @@ func (u *UI) PromptInput(prompt, defaultValue string) (string, error) {
 
 // PromptPassword prompts the user for password input (hidden)
 func (u *UI) PromptPassword(prompt string) (string, error) {
+	// Password prompts cannot be automated in non-interactive mode
+	if u.nonInteractive {
+		return "", fmt.Errorf("non-interactive mode does not support password prompts: %s", prompt)
+	}
+
 	var result string
 	p := &survey.Password{
 		Message: prompt,
@@ -70,6 +90,15 @@ func (u *UI) PromptPasswordConfirm(prompt string) (string, error) {
 
 // PromptSelect prompts the user to select from a list
 func (u *UI) PromptSelect(prompt string, options []string) (int, error) {
+	// In non-interactive mode, select the first option
+	if u.nonInteractive {
+		if len(options) == 0 {
+			return -1, fmt.Errorf("non-interactive mode requires at least one option for: %s", prompt)
+		}
+		u.Infof("[Non-interactive] %s -> %s (first option)", prompt, options[0])
+		return 0, nil
+	}
+
 	var selected string
 	p := &survey.Select{
 		Message: prompt,
@@ -92,6 +121,19 @@ func (u *UI) PromptSelect(prompt string, options []string) (int, error) {
 
 // PromptMultiSelect prompts the user to select multiple items from a list
 func (u *UI) PromptMultiSelect(prompt string, options []string) ([]int, error) {
+	// In non-interactive mode, select all options
+	if u.nonInteractive {
+		if len(options) == 0 {
+			return []int{}, nil
+		}
+		u.Infof("[Non-interactive] %s -> all options (%d)", prompt, len(options))
+		indices := make([]int, len(options))
+		for i := range options {
+			indices[i] = i
+		}
+		return indices, nil
+	}
+
 	var selected []string
 	p := &survey.MultiSelect{
 		Message: prompt,
@@ -122,6 +164,11 @@ func (u *UI) PromptMultiSelect(prompt string, options []string) ([]int, error) {
 
 // PromptInputRequired prompts for required input (cannot be empty)
 func (u *UI) PromptInputRequired(prompt string) (string, error) {
+	// In non-interactive mode, required input cannot be satisfied without a default
+	if u.nonInteractive {
+		return "", fmt.Errorf("non-interactive mode requires a default value for required input: %s", prompt)
+	}
+
 	var result string
 	p := &survey.Input{
 		Message: prompt,
@@ -134,6 +181,15 @@ func (u *UI) PromptInputRequired(prompt string) (string, error) {
 
 // PromptInputWithValidation prompts with custom validation
 func (u *UI) PromptInputWithValidation(prompt, defaultValue string, validator survey.Validator) (string, error) {
+	// In non-interactive mode, return default (skip validation)
+	if u.nonInteractive {
+		if defaultValue == "" {
+			return "", fmt.Errorf("non-interactive mode requires a default value for: %s", prompt)
+		}
+		u.Infof("[Non-interactive] %s -> %s (default, validation skipped)", prompt, defaultValue)
+		return defaultValue, nil
+	}
+
 	var result string
 	p := &survey.Input{
 		Message: prompt,

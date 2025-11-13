@@ -159,18 +159,59 @@ After first boot, the system automatically copies setup scripts to `~/setup/`:
 
 ### Automated Setup (Recommended)
 
-Run the interactive setup script:
+**Option 1: Go CLI (New, Recommended)**
+
+The system includes a compiled Go binary for homelab setup:
+
+```bash
+# Interactive menu (default)
+homelab-setup
+
+# Or run specific commands
+homelab-setup run all              # Run all setup steps
+homelab-setup run quick            # Skip WireGuard
+homelab-setup run preflight        # Run individual step
+homelab-setup status               # Show setup status
+homelab-setup reset                # Reset progress markers
+homelab-setup --help               # Show all commands
+```
+
+**Available Commands:**
+- `homelab-setup` - Launch interactive menu
+- `homelab-setup run [all|quick|step]` - Run setup steps
+- `homelab-setup status` - Show completion status
+- `homelab-setup reset` - Clear all completion markers
+- `homelab-setup troubleshoot` - Run diagnostics
+- `homelab-setup version` - Show version info
+
+**Setup Steps:**
+1. Pre-flight Check - Verify system requirements
+2. User Setup - Configure user account and permissions
+3. Directory Setup - Create directory structure
+4. WireGuard Setup - Configure VPN (optional)
+5. NFS Setup - Configure network storage
+6. Container Setup - Configure container services
+7. Service Deployment - Deploy and start services
+
+**Non-Interactive Mode:**
+
+For automation or scripts:
+```bash
+homelab-setup run all \
+  --non-interactive \
+  --setup-user=containeruser \
+  --nfs-server=192.168.7.10 \
+  --homelab-base-dir=/mnt/homelab \
+  --skip-wireguard
+```
+
+**Option 2: Bash Script (Legacy)**
+
+The original bash script is also available:
 ```bash
 cd ~/setup/home-lab-setup-scripts
 ./homelab-setup.sh
 ```
-
-This will guide you through:
-1. System preflight checks
-2. User and directory configuration
-3. WireGuard VPN setup
-4. NFS mount configuration
-5. Container service deployment
 
 ### Manual Setup
 
