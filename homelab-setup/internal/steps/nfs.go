@@ -2,6 +2,8 @@ package steps
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/common"
@@ -17,6 +19,7 @@ type NFSConfigurator struct {
 	config  *config.Config
 	ui      *ui.UI
 	markers *config.Markers
+	runner  system.CommandRunner
 }
 
 // NewNFSConfigurator creates a new NFSConfigurator instance
@@ -27,7 +30,16 @@ func NewNFSConfigurator(fs *system.FileSystem, network *system.Network, cfg *con
 		config:  cfg,
 		ui:      ui,
 		markers: markers,
+		runner:  system.NewCommandRunner(),
 	}
+}
+
+func (n *NFSConfigurator) getFstabPath() string {
+	path := n.config.GetOrDefault("NFS_FSTAB_PATH", "/etc/fstab")
+	if path == "" {
+		return "/etc/fstab"
+	}
+	return path
 }
 
 // PromptForNFS asks if the user wants to configure NFS
@@ -185,34 +197,62 @@ func (n *NFSConfigurator) CreateMountPoint(mountPoint string) error {
 func (n *NFSConfigurator) AddToFstab(host, export, mountPoint string) error {
 	n.ui.Info("Adding NFS mount to /etc/fstab...")
 
-	// Construct fstab entry
-	// Format: server:/export /mountpoint nfs defaults,nfsvers=4.2,_netdev 0 0
-	fstabEntry := fmt.Sprintf("%s:%s %s nfs defaults,nfsvers=4.2,_netdev 0 0\n", host, export, mountPoint)
-
+	entry := fmt.Sprintf("%s:%s %s nfs defaults,nfsvers=4.2,_netdev 0 0", host, export, mountPoint)
 	n.ui.Info("Fstab entry:")
-	n.ui.Printf("  %s", strings.TrimSpace(fstabEntry))
+	n.ui.Printf("  %s", entry)
 	n.ui.Print("")
+	fstabPath := n.getFstabPath()
 
-	// TODO: Implement WriteFile method in FileSystem to append to /etc/fstab
-	// For now, provide manual instructions
-	n.ui.Warning("Automatic fstab modification not yet implemented")
-	n.ui.Info("Please manually add the following line to /etc/fstab:")
-	n.ui.Printf("  %s", strings.TrimSpace(fstabEntry))
-	n.ui.Print("")
-	n.ui.Info("To add it:")
-	n.ui.Infof("  echo '%s' | sudo tee -a /etc/fstab", strings.TrimSpace(fstabEntry))
-	n.ui.Print("")
-
-	addNow, err := n.ui.PromptYesNo("Have you added this line to /etc/fstab?", false)
+	existing, err := os.ReadFile(fstabPath)
 	if err != nil {
-		return fmt.Errorf("failed to prompt: %w", err)
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to read %s: %w", fstabPath, err)
+		}
+		// If the file doesn't exist, ensure the directory exists
+		dir := filepath.Dir(fstabPath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory for %s: %w", fstabPath, err)
+		}
 	}
 
-	if !addNow {
-		n.ui.Warning("You will need to manually add this entry to /etc/fstab later")
-		return nil
+	entryExists := false
+	if len(existing) > 0 {
+		for _, line := range strings.Split(string(existing), "\n") {
+			if strings.TrimSpace(line) == entry {
+				entryExists = true
+				break
+			}
+		}
 	}
 
+	if entryExists {
+		n.ui.Info("Fstab entry already exists; skipping append")
+	} else {
+		var builder strings.Builder
+		if len(existing) > 0 {
+			builder.Write(existing)
+			if !strings.HasSuffix(string(existing), "\n") {
+				builder.WriteString("\n")
+			}
+		}
+		builder.WriteString(entry)
+		builder.WriteString("\n")
+
+		if err := n.fs.WriteFile(fstabPath, []byte(builder.String()), 0644); err != nil {
+			return fmt.Errorf("failed to update %s: %w", fstabPath, err)
+		}
+		w := "fstab entry"
+		if fstabPath != "/etc/fstab" {
+			w = fmt.Sprintf("fstab entry in %s", fstabPath)
+		}
+		n.ui.Success(fmt.Sprintf("Created %s", w))
+	}
+
+	if output, err := n.runner.Run("sudo", "-n", "systemctl", "daemon-reload"); err != nil {
+		return fmt.Errorf("failed to reload systemd after fstab update: %w\nOutput: %s", err, output)
+	}
+
+	n.ui.Success("systemd reloaded to pick up new mount units")
 	return nil
 }
 
@@ -220,21 +260,8 @@ func (n *NFSConfigurator) AddToFstab(host, export, mountPoint string) error {
 func (n *NFSConfigurator) MountNFS(mountPoint string) error {
 	n.ui.Infof("Mounting NFS share at %s...", mountPoint)
 
-	// TODO: Implement mount command execution
-	// For now, provide manual instructions
-	n.ui.Info("To mount the share:")
-	n.ui.Infof("  sudo mount %s", mountPoint)
-	n.ui.Print("")
-
-	mounted, err := n.ui.PromptYesNo("Have you mounted the share?", false)
-	if err != nil {
-		return fmt.Errorf("failed to prompt: %w", err)
-	}
-
-	if !mounted {
-		n.ui.Warning("NFS share not mounted")
-		n.ui.Infof("You can mount it later with: sudo mount %s", mountPoint)
-		return nil
+	if output, err := n.runner.Run("sudo", "-n", "mount", mountPoint); err != nil {
+		return fmt.Errorf("failed to mount %s: %w\nOutput: %s", mountPoint, err, output)
 	}
 
 	n.ui.Success("NFS share mounted successfully")
@@ -319,8 +346,7 @@ func (n *NFSConfigurator) Run() error {
 	// Mount NFS share
 	n.ui.Step("Mounting NFS Share")
 	if err := n.MountNFS(mountPoint); err != nil {
-		n.ui.Warning(fmt.Sprintf("Failed to mount NFS: %v", err))
-		// Non-critical error, save config anyway
+		return fmt.Errorf("failed to mount NFS share: %w", err)
 	}
 
 	// Save configuration

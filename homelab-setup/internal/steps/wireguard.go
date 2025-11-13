@@ -3,6 +3,7 @@ package steps
 import (
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/common"
@@ -42,6 +43,14 @@ func NewWireGuardSetup(packages *system.PackageManager, services *system.Service
 		ui:       ui,
 		markers:  markers,
 	}
+}
+
+func (w *WireGuardSetup) configDir() string {
+	dir := w.config.GetOrDefault("WIREGUARD_CONFIG_DIR", "/etc/wireguard")
+	if dir == "" {
+		return "/etc/wireguard"
+	}
+	return dir
 }
 
 // PromptForWireGuard asks if the user wants to configure WireGuard
@@ -181,31 +190,40 @@ PrivateKey = %s
 # Endpoint = <peer-ip>:51820
 `, cfg.InterfaceIP, cfg.ListenPort, privateKey)
 
-	configPath := fmt.Sprintf("/etc/wireguard/%s.conf", cfg.InterfaceName)
-
 	w.ui.Print("")
 	w.ui.Info("Configuration file content:")
 	w.ui.Print(configContent)
 	w.ui.Print("")
 
-	// TODO: Implement WriteFile in FileSystem
-	w.ui.Warning("Automatic config file creation not yet implemented")
-	w.ui.Infof("Please create %s with the content shown above", configPath)
-	w.ui.Info("Commands:")
-	w.ui.Infof("  echo '<content>' | sudo tee %s", configPath)
-	w.ui.Infof("  sudo chmod 600 %s", configPath)
-	w.ui.Print("")
+	configDir := w.configDir()
+	configPath := filepath.Join(configDir, fmt.Sprintf("%s.conf", cfg.InterfaceName))
 
-	created, err := w.ui.PromptYesNo("Have you created the config file?", false)
+	if err := w.fs.EnsureDirectory(configDir, "root:root", 0750); err != nil {
+		return fmt.Errorf("failed to ensure WireGuard directory %s: %w", configDir, err)
+	}
+
+	if err := w.fs.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+		return fmt.Errorf("failed to write WireGuard config: %w", err)
+	}
+
+	exists, err := w.fs.FileExists(configPath)
 	if err != nil {
-		return fmt.Errorf("failed to prompt: %w", err)
+		return fmt.Errorf("failed to verify config file: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("WireGuard config %s was not created", configPath)
 	}
 
-	if !created {
-		w.ui.Warning("Config file not created")
-		w.ui.Info("You'll need to create it manually before starting the service")
-		return nil
+	perms, err := w.fs.GetPermissions(configPath)
+	if err != nil {
+		return fmt.Errorf("failed to check permissions on %s: %w", configPath, err)
 	}
+	if perms.Perm() != 0600 {
+		return fmt.Errorf("WireGuard config %s must have 0600 permissions, found %o", configPath, perms.Perm())
+	}
+
+	w.ui.Successf("Configuration file created at %s", configPath)
+	w.ui.Info("Review the file to add peers as needed")
 
 	return nil
 }
