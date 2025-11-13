@@ -77,6 +77,7 @@ func (d *DirectorySetup) CreateBaseStructure(baseDir, owner string) error {
 		{filepath.Join(baseDir, "data"), "Service data"},
 		{filepath.Join(baseDir, "compose"), "Docker Compose files"},
 		{filepath.Join(baseDir, "services"), "Individual service directories"},
+		{filepath.Join(baseDir, "appdata"), "Application data"},
 	}
 
 	// Create each directory
@@ -175,6 +176,7 @@ func (d *DirectorySetup) VerifyStructure(baseDir string) error {
 		filepath.Join(baseDir, "data"),
 		filepath.Join(baseDir, "compose"),
 		filepath.Join(baseDir, "services"),
+		filepath.Join(baseDir, "appdata"),
 	}
 
 	for _, dir := range requiredDirs {
@@ -324,6 +326,13 @@ func (d *DirectorySetup) Run() error {
 	d.ui.Step("Saving Configuration")
 	if err := d.config.Set("HOMELAB_BASE_DIR", baseDir); err != nil {
 		return fmt.Errorf("failed to save base directory: %w", err)
+	}
+	if err := d.config.Set("CONTAINERS_BASE", baseDir); err != nil {
+		return fmt.Errorf("failed to save containers base directory: %w", err)
+	}
+	appdataPath := filepath.Join(baseDir, "appdata")
+	if err := d.config.Set("APPDATA_PATH", appdataPath); err != nil {
+		return fmt.Errorf("failed to save appdata path: %w", err)
 	}
 
 	d.ui.Print("")

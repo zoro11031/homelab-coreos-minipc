@@ -24,6 +24,20 @@ type ContainerSetup struct {
 	markers    *config.Markers
 }
 
+// getContainersBase returns the base directory for service files, preferring the
+// unified homelab base directory when available.
+func (c *ContainerSetup) getContainersBase() string {
+	if base := c.config.GetOrDefault("HOMELAB_BASE_DIR", ""); base != "" {
+		return base
+	}
+	return c.config.GetOrDefault("CONTAINERS_BASE", "/srv/containers")
+}
+
+// serviceDirectory returns the directory path for a given service.
+func (c *ContainerSetup) serviceDirectory(serviceName string) string {
+	return filepath.Join(c.getContainersBase(), serviceName)
+}
+
 // NewContainerSetup creates a new ContainerSetup instance
 func NewContainerSetup(containers *system.ContainerManager, fs *system.FileSystem, cfg *config.Config, ui *ui.UI, markers *config.Markers) *ContainerSetup {
 	return &ContainerSetup{
@@ -102,10 +116,10 @@ func (c *ContainerSetup) DiscoverStacks(templateDir string) (map[string]string, 
 
 	// Exclude patterns
 	excludePatterns := []string{
-		".*",           // Hidden files
-		"*.example",    // Example files
-		"README*",      // Documentation files
-		"*.md",         // Markdown files
+		".*",        // Hidden files
+		"*.example", // Example files
+		"README*",   // Documentation files
+		"*.md",      // Markdown files
 	}
 
 	entries, err := os.ReadDir(templateDir)
@@ -261,12 +275,10 @@ func (c *ContainerSetup) CopyTemplates(templateDir string, stacks map[string]str
 		return fmt.Errorf("homelab user not configured")
 	}
 
-	containersBase := c.config.GetOrDefault("CONTAINERS_BASE", "/srv/containers")
-
 	for _, serviceName := range selectedStacks {
 		templateFile := stacks[serviceName]
 		srcPath := filepath.Join(templateDir, templateFile)
-		dstDir := filepath.Join(containersBase, serviceName)
+		dstDir := c.serviceDirectory(serviceName)
 		dstPath := filepath.Join(dstDir, "compose.yml")
 
 		// Ensure destination directory exists
@@ -475,10 +487,9 @@ func (c *ContainerSetup) CreateEnvFiles(selectedStacks []string) error {
 	c.ui.Step("Creating Environment Files")
 
 	setupUser := c.config.GetOrDefault("HOMELAB_USER", "")
-	containersBase := c.config.GetOrDefault("CONTAINERS_BASE", "/srv/containers")
 
 	for _, serviceName := range selectedStacks {
-		envPath := filepath.Join(containersBase, serviceName, ".env")
+		envPath := filepath.Join(c.serviceDirectory(serviceName), ".env")
 		c.ui.Infof("Creating environment file: %s", envPath)
 
 		content := c.generateEnvContent(serviceName)

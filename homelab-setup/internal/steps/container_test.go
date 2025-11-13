@@ -152,7 +152,7 @@ func TestGenerateEnvContent_Media(t *testing.T) {
 
 func TestGetServiceInfo(t *testing.T) {
 	cfg := config.New("")
-	cfg.Set("CONTAINERS_BASE", "/test/containers")
+	cfg.Set("HOMELAB_BASE_DIR", "/test/containers")
 
 	containers := system.NewContainerManager()
 	fs := system.NewFileSystem()
@@ -175,6 +175,32 @@ func TestGetServiceInfo(t *testing.T) {
 	}
 	if info.UnitName != "podman-compose-media.service" {
 		t.Errorf("Expected UnitName=podman-compose-media.service, got %s", info.UnitName)
+	}
+}
+
+func TestContainerSetupServiceDirectoryUsesHomelabBase(t *testing.T) {
+	cfg := config.New("")
+	cfg.Set("HOMELAB_BASE_DIR", "/mnt/homelab")
+
+	setup := NewContainerSetup(system.NewContainerManager(), system.NewFileSystem(), cfg, ui.New(), config.NewMarkers(""))
+
+	dir := setup.serviceDirectory("media")
+	expected := filepath.Join("/mnt/homelab", "media")
+	if dir != expected {
+		t.Fatalf("expected %s, got %s", expected, dir)
+	}
+}
+
+func TestContainerSetupServiceDirectoryFallback(t *testing.T) {
+	cfg := config.New("")
+	cfg.Set("CONTAINERS_BASE", "/legacy")
+
+	setup := NewContainerSetup(system.NewContainerManager(), system.NewFileSystem(), cfg, ui.New(), config.NewMarkers(""))
+
+	dir := setup.serviceDirectory("web")
+	expected := filepath.Join("/legacy", "web")
+	if dir != expected {
+		t.Fatalf("expected %s, got %s", expected, dir)
 	}
 }
 

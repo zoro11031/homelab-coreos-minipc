@@ -24,6 +24,16 @@ type Deployment struct {
 	markers    *config.Markers
 }
 
+// getServiceBaseDir resolves the base directory for service deployments.
+// HOMELAB_BASE_DIR is treated as the source of truth with a fallback to the
+// legacy CONTAINERS_BASE key for backward compatibility.
+func (d *Deployment) getServiceBaseDir() string {
+	if base := d.config.GetOrDefault("HOMELAB_BASE_DIR", ""); base != "" {
+		return base
+	}
+	return d.config.GetOrDefault("CONTAINERS_BASE", "/srv/containers")
+}
+
 // ServiceInfo holds information about a service
 type ServiceInfo struct {
 	Name        string
@@ -57,15 +67,13 @@ func (d *Deployment) GetSelectedServices() ([]string, error) {
 
 // GetServiceInfo returns information about a service
 func (d *Deployment) GetServiceInfo(serviceName string) *ServiceInfo {
-	containersBase := d.config.GetOrDefault("CONTAINERS_BASE", "/srv/containers")
-
 	// Use cases.Title instead of deprecated strings.Title
 	caser := cases.Title(language.English)
 
 	return &ServiceInfo{
 		Name:        serviceName,
 		DisplayName: caser.String(serviceName),
-		Directory:   filepath.Join(containersBase, serviceName),
+		Directory:   filepath.Join(d.getServiceBaseDir(), serviceName),
 		UnitName:    fmt.Sprintf("podman-compose-%s.service", serviceName),
 	}
 }
@@ -306,9 +314,9 @@ func (d *Deployment) DisplayAccessInfo() {
 			"Homepage":  "3000",
 		},
 		"cloud": {
-			"Nextcloud":  "8080",
-			"Collabora":  "9980",
-			"Immich":     "2283",
+			"Nextcloud": "8080",
+			"Collabora": "9980",
+			"Immich":    "2283",
 		},
 	}
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/cli"
@@ -90,6 +91,13 @@ func applyNonInteractiveConfig(ctx *cli.SetupContext) error {
 	if homelabBaseDir != "" {
 		if err := ctx.Config.Set("HOMELAB_BASE_DIR", homelabBaseDir); err != nil {
 			return fmt.Errorf("failed to set HOMELAB_BASE_DIR: %w", err)
+		}
+		if err := ctx.Config.Set("CONTAINERS_BASE", homelabBaseDir); err != nil {
+			return fmt.Errorf("failed to set CONTAINERS_BASE: %w", err)
+		}
+		appdataPath := filepath.Join(homelabBaseDir, "appdata")
+		if err := ctx.Config.Set("APPDATA_PATH", appdataPath); err != nil {
+			return fmt.Errorf("failed to set APPDATA_PATH: %w", err)
 		}
 	}
 
