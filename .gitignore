@@ -54,6 +54,7 @@ ignition/*.ign
 
 # Go build artifacts
 homelab-setup/bin/
+homelab-setup/homelab-setup
 homelab-setup/*.exe
 homelab-setup/*.dll
 homelab-setup/*.so
