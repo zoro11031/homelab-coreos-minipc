@@ -9,8 +9,11 @@ services:
       - ..:/workspace:cached
       # Cache Go modules to avoid re-downloading across container lifecycles
       - go-modules:/go/pkg/mod
+      # Cache Go build artifacts to speed up subsequent builds
+      - go-build-cache:/home/vscode/.cache/go-build
     command: sleep infinity
     working_dir: /workspace
 
 volumes:
   go-modules:
+  go-build-cache:
