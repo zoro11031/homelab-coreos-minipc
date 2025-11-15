@@ -21,6 +21,14 @@ type WireGuardConfig struct {
 	PublicKey     string
 }
 
+// WireGuardPeer holds peer configuration
+type WireGuardPeer struct {
+	Name       string // Human-readable name for reference
+	PublicKey  string
+	AllowedIPs string
+	Endpoint   string // Optional
+}
+
 // WireGuardSetup handles WireGuard VPN setup
 type WireGuardSetup struct {
 	packages *system.PackageManager
@@ -231,50 +239,142 @@ PrivateKey = %s
 func (w *WireGuardSetup) EnableService(interfaceName string) error {
 	serviceName := fmt.Sprintf("wg-quick@%s.service", interfaceName)
 
-	w.ui.Infof("Enabling %s...", serviceName)
-
-	// Check if service exists
-	exists, err := w.services.ServiceExists(serviceName)
-	if err != nil {
-		return fmt.Errorf("failed to check service: %w", err)
-	}
-
-	if !exists {
-		w.ui.Warning(fmt.Sprintf("Service %s not found", serviceName))
-		w.ui.Info("This is normal - wg-quick services are dynamically created")
-	}
-
-	// Enable service
-	w.ui.Info("To enable and start the service:")
-	w.ui.Infof("  sudo systemctl enable %s", serviceName)
-	w.ui.Infof("  sudo systemctl start %s", serviceName)
+	w.ui.Print("")
+	w.ui.Info("The WireGuard service needs to be enabled and started.")
 	w.ui.Print("")
 
-	enabled, err := w.ui.PromptYesNo("Have you enabled and started the service?", false)
+	autoEnable, err := w.ui.PromptYesNo("Do you want to enable and start the service now?", true)
 	if err != nil {
 		return fmt.Errorf("failed to prompt: %w", err)
 	}
 
-	if enabled {
-		w.ui.Success("WireGuard service enabled and started")
-
-		// Display status instructions
+	if !autoEnable {
 		w.ui.Print("")
-		w.ui.Info("To check WireGuard status:")
-		w.ui.Infof("  sudo systemctl status %s", serviceName)
-		w.ui.Infof("  sudo wg show %s", interfaceName)
-	} else {
+		w.ui.Info("To enable and start the service manually:")
+		w.ui.Infof("  sudo systemctl enable %s", serviceName)
+		w.ui.Infof("  sudo systemctl start %s", serviceName)
+		w.ui.Print("")
 		w.ui.Warning("WireGuard service not started")
-		w.ui.Info("Start it later with the commands shown above")
+		return nil
 	}
+
+	w.ui.Print("")
+	w.ui.Infof("Enabling %s...", serviceName)
+
+	// Enable service
+	if err := w.services.Enable(serviceName); err != nil {
+		w.ui.Warning(fmt.Sprintf("Failed to enable service: %v", err))
+		w.ui.Info("You may need to run manually:")
+		w.ui.Infof("  sudo systemctl enable %s", serviceName)
+		return fmt.Errorf("failed to enable service: %w", err)
+	}
+	w.ui.Success("Service enabled")
+
+	// Start service
+	w.ui.Infof("Starting %s...", serviceName)
+	if err := w.services.Start(serviceName); err != nil {
+		w.ui.Warning(fmt.Sprintf("Failed to start service: %v", err))
+		w.ui.Info("You may need to run manually:")
+		w.ui.Infof("  sudo systemctl start %s", serviceName)
+		return fmt.Errorf("failed to start service: %w", err)
+	}
+	w.ui.Success("Service started")
+
+	// Check if service is actually running
+	active, err := w.services.IsActive(serviceName)
+	if err != nil {
+		w.ui.Warning(fmt.Sprintf("Could not verify service status: %v", err))
+	} else if active {
+		w.ui.Success("WireGuard service is running")
+	} else {
+		w.ui.Warning("Service may not be running correctly")
+	}
+
+	// Display status instructions
+	w.ui.Print("")
+	w.ui.Info("To check WireGuard status:")
+	w.ui.Infof("  sudo systemctl status %s", serviceName)
+	w.ui.Infof("  sudo wg show %s", interfaceName)
 
 	return nil
 }
 
-// DisplayPeerInstructions displays instructions for adding peers
-func (w *WireGuardSetup) DisplayPeerInstructions(interfaceName, publicKey string) {
+// PromptForPeer prompts for peer configuration
+func (w *WireGuardSetup) PromptForPeer(nextIP string) (*WireGuardPeer, error) {
+	peer := &WireGuardPeer{}
+
 	w.ui.Print("")
-	w.ui.Info("Adding WireGuard Peers:")
+
+	// Prompt for peer name
+	name, err := w.ui.PromptInput("Peer name (e.g., 'laptop', 'phone', 'vps')", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to prompt for peer name: %w", err)
+	}
+	peer.Name = name
+
+	// Prompt for public key
+	publicKey, err := w.ui.PromptInput("Peer public key", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to prompt for public key: %w", err)
+	}
+	if publicKey == "" {
+		return nil, fmt.Errorf("public key is required")
+	}
+	peer.PublicKey = publicKey
+
+	// Prompt for allowed IPs
+	allowedIPs, err := w.ui.PromptInput("Allowed IPs for this peer", nextIP)
+	if err != nil {
+		return nil, fmt.Errorf("failed to prompt for allowed IPs: %w", err)
+	}
+	peer.AllowedIPs = allowedIPs
+
+	// Prompt for endpoint (optional)
+	w.ui.Info("Endpoint is optional - leave empty for road warrior clients")
+	endpoint, err := w.ui.PromptInput("Endpoint (e.g., 'server.example.com:51820')", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to prompt for endpoint: %w", err)
+	}
+	peer.Endpoint = endpoint
+
+	return peer, nil
+}
+
+// AddPeerToConfig appends a peer configuration to the WireGuard config file
+func (w *WireGuardSetup) AddPeerToConfig(interfaceName string, peer *WireGuardPeer) error {
+	configPath := filepath.Join(w.configDir(), fmt.Sprintf("%s.conf", interfaceName))
+
+	// Read current config (using sudo cat to handle permissions)
+	cmd := exec.Command("sudo", "-n", "cat", configPath)
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to read config file: %w", err)
+	}
+
+	// Build peer section
+	peerSection := fmt.Sprintf("\n# Peer: %s\n[Peer]\nPublicKey = %s\nAllowedIPs = %s\n",
+		peer.Name, peer.PublicKey, peer.AllowedIPs)
+
+	if peer.Endpoint != "" {
+		peerSection += fmt.Sprintf("Endpoint = %s\n", peer.Endpoint)
+	}
+
+	// Append peer to config
+	newContent := string(output) + peerSection
+
+	// Write updated config
+	if err := w.fs.WriteFile(configPath, []byte(newContent), 0600); err != nil {
+		return fmt.Errorf("failed to write config file: %w", err)
+	}
+
+	w.ui.Successf("Peer '%s' added to configuration", peer.Name)
+	return nil
+}
+
+// AddPeers interactively adds WireGuard peers
+func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) error {
+	w.ui.Print("")
+	w.ui.Info("WireGuard Peer Configuration:")
 	w.ui.Separator()
 	w.ui.Print("")
 
@@ -282,26 +382,102 @@ func (w *WireGuardSetup) DisplayPeerInstructions(interfaceName, publicKey string
 	w.ui.Printf("  %s", publicKey)
 	w.ui.Print("")
 
-	w.ui.Info("To add a peer, edit the config file:")
-	w.ui.Infof("  sudo nano /etc/wireguard/%s.conf", interfaceName)
-	w.ui.Print("")
+	addPeers, err := w.ui.PromptYesNo("Do you want to add peers now?", false)
+	if err != nil {
+		return fmt.Errorf("failed to prompt for adding peers: %w", err)
+	}
 
-	w.ui.Info("Add a peer section:")
-	w.ui.Print("  [Peer]")
-	w.ui.Print("  PublicKey = <peer-public-key>")
-	w.ui.Print("  AllowedIPs = 10.253.0.2/32")
-	w.ui.Print("  # Endpoint = <peer-ip>:51820  # If peer is client")
-	w.ui.Print("")
+	if !addPeers {
+		w.ui.Print("")
+		w.ui.Info("You can add peers later by editing:")
+		w.ui.Infof("  %s", filepath.Join(w.configDir(), fmt.Sprintf("%s.conf", interfaceName)))
+		w.ui.Print("")
+		w.ui.Info("After editing, restart the service:")
+		w.ui.Infof("  sudo systemctl restart wg-quick@%s", interfaceName)
+		return nil
+	}
 
-	w.ui.Info("After editing, restart the service:")
-	w.ui.Infof("  sudo systemctl restart wg-quick@%s", interfaceName)
-	w.ui.Print("")
+	// Parse the interface IP to suggest next IP for peers
+	// For example, if server is 10.253.0.1/24, suggest 10.253.0.2/32 for first peer
+	nextIP := "10.253.0.2/32"
+	if strings.Contains(interfaceIP, "/") {
+		parts := strings.Split(interfaceIP, "/")
+		if len(parts) > 0 {
+			ipParts := strings.Split(parts[0], ".")
+			if len(ipParts) == 4 {
+				nextIP = fmt.Sprintf("%s.%s.%s.2/32", ipParts[0], ipParts[1], ipParts[2])
+			}
+		}
+	}
 
+	peerCount := 0
+	for {
+		w.ui.Print("")
+		w.ui.Infof("Adding peer #%d", peerCount+1)
+
+		peer, err := w.PromptForPeer(nextIP)
+		if err != nil {
+			w.ui.Warning(fmt.Sprintf("Failed to get peer configuration: %v", err))
+			continue
+		}
+
+		if err := w.AddPeerToConfig(interfaceName, peer); err != nil {
+			w.ui.Warning(fmt.Sprintf("Failed to add peer: %v", err))
+			continue
+		}
+
+		peerCount++
+
+		// Increment suggested IP for next peer
+		if strings.Contains(nextIP, "/32") {
+			parts := strings.Split(nextIP, ".")
+			if len(parts) == 4 {
+				lastOctet := strings.Split(parts[3], "/")[0]
+				var octet int
+				fmt.Sscanf(lastOctet, "%d", &octet)
+				octet++
+				nextIP = fmt.Sprintf("%s.%s.%s.%d/32", parts[0], parts[1], parts[2], octet)
+			}
+		}
+
+		w.ui.Print("")
+		addMore, err := w.ui.PromptYesNo("Add another peer?", false)
+		if err != nil || !addMore {
+			break
+		}
+	}
+
+	if peerCount > 0 {
+		w.ui.Print("")
+		w.ui.Successf("Added %d peer(s)", peerCount)
+
+		// Check if service is running and offer to restart
+		serviceName := fmt.Sprintf("wg-quick@%s.service", interfaceName)
+		active, _ := w.services.IsActive(serviceName)
+
+		if active {
+			w.ui.Print("")
+			w.ui.Info("The WireGuard service needs to be restarted to apply peer changes.")
+			restart, err := w.ui.PromptYesNo("Restart the service now?", true)
+			if err == nil && restart {
+				w.ui.Info("Restarting service...")
+				if err := w.services.Restart(serviceName); err != nil {
+					w.ui.Warning(fmt.Sprintf("Failed to restart service: %v", err))
+					w.ui.Infof("Restart manually: sudo systemctl restart %s", serviceName)
+				} else {
+					w.ui.Success("Service restarted successfully")
+				}
+			}
+		}
+	}
+
+	w.ui.Print("")
 	w.ui.Info("For client configuration, provide them with:")
 	w.ui.Infof("  - Server public key: %s", publicKey)
 	w.ui.Info("  - Server endpoint: <your-public-ip>:51820")
-	w.ui.Info("  - Allowed IPs for the client")
-	w.ui.Print("")
+	w.ui.Info("  - Client's AllowedIPs: 0.0.0.0/0 (to route all traffic) or specific subnets")
+
+	return nil
 }
 
 const wireGuardCompletionMarker = "wireguard-setup-complete"
@@ -376,9 +552,12 @@ func (w *WireGuardSetup) Run() error {
 		// Non-critical, continue
 	}
 
-	// Display peer instructions
+	// Add peers interactively
 	w.ui.Step("Peer Configuration")
-	w.DisplayPeerInstructions(cfg.InterfaceName, publicKey)
+	if err := w.AddPeers(cfg.InterfaceName, publicKey, cfg.InterfaceIP); err != nil {
+		w.ui.Warning(fmt.Sprintf("Failed to add peers: %v", err))
+		// Non-critical, continue
+	}
 
 	// Save configuration
 	w.ui.Step("Saving Configuration")
