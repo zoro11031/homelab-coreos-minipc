@@ -1,7 +1,9 @@
 package steps
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -38,6 +40,27 @@ type WireGuardSetup struct {
 	config   *config.Config
 	ui       *ui.UI
 	markers  *config.Markers
+}
+
+// sanitizePeerName removes or replaces characters that could break the WireGuard config format
+// or be used to inject additional configuration sections
+func sanitizePeerName(name string) string {
+	// Remove newlines, carriage returns, and other control characters
+	name = strings.ReplaceAll(name, "\n", "")
+	name = strings.ReplaceAll(name, "\r", "")
+	name = strings.ReplaceAll(name, "\t", " ")
+	
+	// Remove brackets that could be used to inject sections
+	name = strings.ReplaceAll(name, "[", "")
+	name = strings.ReplaceAll(name, "]", "")
+	
+	// Remove hash/pound sign to prevent comment injection
+	name = strings.ReplaceAll(name, "#", "")
+	
+	// Trim whitespace
+	name = strings.TrimSpace(name)
+	
+	return name
 }
 
 // NewWireGuardSetup creates a new WireGuardSetup instance
@@ -385,9 +408,10 @@ func (w *WireGuardSetup) AddPeerToConfig(interfaceName string, peer *WireGuardPe
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	// Build peer section
+	// Build peer section with sanitized name to prevent config injection
+	sanitizedName := sanitizePeerName(peer.Name)
 	peerSection := fmt.Sprintf("\n# Peer: %s\n[Peer]\nPublicKey = %s\nAllowedIPs = %s\n",
-		peer.Name, peer.PublicKey, peer.AllowedIPs)
+		sanitizedName, peer.PublicKey, peer.AllowedIPs)
 
 	if peer.Endpoint != "" {
 		peerSection += fmt.Sprintf("Endpoint = %s\n", peer.Endpoint)
@@ -444,6 +468,9 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 			if incremented, err := incrementIP(baseIP); err == nil {
 				nextIP = incremented
 			}
+		} else {
+			// Malformed interfaceIP, fallback to default suggestion
+			nextIP = "10.253.0.2/32"
 		}
 	}
 
@@ -454,6 +481,12 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 
 		peer, err := w.PromptForPeer(nextIP)
 		if err != nil {
+			// Check if the error is non-recoverable (e.g., EOF, input stream closed)
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.ErrClosedPipe) {
+				w.ui.Error(fmt.Sprintf("Input stream closed: %v", err))
+				break
+			}
+			// For recoverable errors (e.g., validation errors), show warning and retry
 			w.ui.Warning(fmt.Sprintf("Failed to get peer configuration: %v", err))
 			continue
 		}
