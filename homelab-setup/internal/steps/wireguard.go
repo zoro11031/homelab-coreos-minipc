@@ -415,11 +415,14 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 	nextIP := "10.253.0.2/32"
 	if strings.Contains(interfaceIP, "/") {
 		parts := strings.Split(interfaceIP, "/")
-		if len(parts) > 0 {
+		if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
 			ipParts := strings.Split(parts[0], ".")
 			if len(ipParts) == 4 {
 				nextIP = fmt.Sprintf("%s.%s.%s.2/32", ipParts[0], ipParts[1], ipParts[2])
 			}
+		} else {
+			// Malformed interfaceIP, fallback to default suggestion
+			nextIP = "10.253.0.2/32"
 		}
 	}
 
