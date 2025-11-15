@@ -217,8 +217,8 @@ GETTING HELP:
 
 DOCUMENTATION:
 
-  - README.md: Complete documentation
-  - QUICKSTART.md: Quick reference guide
+  - README.md: Project overview + links (https://github.com/zoro11031/homelab-coreos-minipc)
+  - docs/getting-started.md: Consolidated setup walkthrough
 
 EOF
 
