@@ -151,6 +151,15 @@ func (sm *StepManager) IsStepComplete(markerName string) bool {
 	return exists
 }
 
+// removeMarkerIfRerun removes a marker if the user chooses to rerun the step
+func (sm *StepManager) removeMarkerIfRerun(markerName string, rerun bool) {
+	if rerun {
+		if err := sm.markers.Remove(markerName); err != nil {
+			sm.ui.Warning(fmt.Sprintf("Failed to remove marker: %v", err))
+		}
+	}
+}
+
 // RunStep executes a specific step by short name
 func (sm *StepManager) RunStep(shortName string) error {
 	sm.ui.Header(fmt.Sprintf("Running: %s", shortName))
@@ -206,10 +215,7 @@ func (sm *StepManager) runPreflight() error {
 		if err != nil || !rerun {
 			return nil
 		}
-		// Delete the marker so the step can re-run
-		if err := sm.markers.Remove("preflight-complete"); err != nil {
-			sm.ui.Warning(fmt.Sprintf("Failed to remove marker: %v", err))
-		}
+		sm.removeMarkerIfRerun("preflight-complete", rerun)
 	}
 
 	// Use the RunAll method that exists in PreflightChecker
@@ -224,10 +230,7 @@ func (sm *StepManager) runUser() error {
 		if err != nil || !rerun {
 			return nil
 		}
-		// Delete the marker so the step can re-run
-		if err := sm.markers.Remove("user-setup-complete"); err != nil {
-			sm.ui.Warning(fmt.Sprintf("Failed to remove marker: %v", err))
-		}
+		sm.removeMarkerIfRerun("user-setup-complete", rerun)
 	}
 
 	// Use the Run method that exists in UserConfigurator
@@ -242,10 +245,7 @@ func (sm *StepManager) runDirectory() error {
 		if err != nil || !rerun {
 			return nil
 		}
-		// Delete the marker so the step can re-run
-		if err := sm.markers.Remove("directory-setup-complete"); err != nil {
-			sm.ui.Warning(fmt.Sprintf("Failed to remove marker: %v", err))
-		}
+		sm.removeMarkerIfRerun("directory-setup-complete", rerun)
 	}
 
 	// Use the Run method that exists in DirectorySetup
@@ -260,10 +260,7 @@ func (sm *StepManager) runWireGuard() error {
 		if err != nil || !rerun {
 			return nil
 		}
-		// Delete the marker so the step can re-run
-		if err := sm.markers.Remove("wireguard-setup-complete"); err != nil {
-			sm.ui.Warning(fmt.Sprintf("Failed to remove marker: %v", err))
-		}
+		sm.removeMarkerIfRerun("wireguard-setup-complete", rerun)
 	}
 
 	// Use the Run method that exists in WireGuardSetup
@@ -279,10 +276,7 @@ func (sm *StepManager) runNFS() error {
 		if err != nil || !rerun {
 			return nil
 		}
-		// Delete the marker so the step can re-run
-		if err := sm.markers.Remove("nfs-setup-complete"); err != nil {
-			sm.ui.Warning(fmt.Sprintf("Failed to remove marker: %v", err))
-		}
+		sm.removeMarkerIfRerun("nfs-setup-complete", rerun)
 	}
 
 	// Use the Run method that exists in NFSConfigurator
@@ -297,10 +291,7 @@ func (sm *StepManager) runContainer() error {
 		if err != nil || !rerun {
 			return nil
 		}
-		// Delete the marker so the step can re-run
-		if err := sm.markers.Remove("container-setup-complete"); err != nil {
-			sm.ui.Warning(fmt.Sprintf("Failed to remove marker: %v", err))
-		}
+		sm.removeMarkerIfRerun("container-setup-complete", rerun)
 	}
 
 	// Use the Run method that exists in ContainerSetup
@@ -315,10 +306,7 @@ func (sm *StepManager) runDeployment() error {
 		if err != nil || !rerun {
 			return nil
 		}
-		// Delete the marker so the step can re-run
-		if err := sm.markers.Remove("service-deployment-complete"); err != nil {
-			sm.ui.Warning(fmt.Sprintf("Failed to remove marker: %v", err))
-		}
+		sm.removeMarkerIfRerun("service-deployment-complete", rerun)
 	}
 
 	// Use the Run method that exists in Deployment
