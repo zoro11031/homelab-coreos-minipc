@@ -310,6 +310,9 @@ func (w *WireGuardSetup) PromptForPeer(nextIP string) (*WireGuardPeer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to prompt for peer name: %w", err)
 	}
+	if name == "" {
+		return nil, fmt.Errorf("peer name is required")
+	}
 	peer.Name = name
 
 	// Prompt for public key
