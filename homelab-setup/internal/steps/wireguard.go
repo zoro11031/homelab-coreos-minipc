@@ -426,6 +426,10 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 
 		if err := w.AddPeerToConfig(interfaceName, peer); err != nil {
 			w.ui.Warning(fmt.Sprintf("Failed to add peer: %v", err))
+			retry, err := w.ui.PromptYesNo("Failed to add peer. Would you like to retry?", true)
+			if err != nil || !retry {
+				break
+			}
 			continue
 		}
 
