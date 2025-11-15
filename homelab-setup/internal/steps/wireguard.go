@@ -455,9 +455,14 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 				octet++
 				if octet > 254 {
 					w.ui.Warning("Maximum number of peers reached (254). Cannot assign more unique IP addresses in this subnet.")
-					break
+				if _, err := fmt.Sscanf(lastOctet, "%d", &octet); err != nil {
+					w.ui.Warning(fmt.Sprintf("Failed to parse last octet '%s': %v", lastOctet, err))
+					// Optionally, skip incrementing or set a sensible default, e.g. octet = 1
+					// continue
+				} else {
+					octet++
+					nextIP = fmt.Sprintf("%s.%s.%s.%d/32", parts[0], parts[1], parts[2], octet)
 				}
-				nextIP = fmt.Sprintf("%s.%s.%s.%d/32", parts[0], parts[1], parts[2], octet)
 			}
 		}
 
