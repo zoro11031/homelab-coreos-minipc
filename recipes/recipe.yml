@@ -12,6 +12,15 @@ modules:
     scripts:
       - install-rpmfusion-release.sh
   - from-file: packages.yml
+  # Copy Python package source for installation
+  - type: files
+    files:
+      - source: ../homelab-setup-py
+        destination: /tmp/homelab-setup-py
+  # Install Python package
+  - type: script
+    scripts:
+      - install-homelab-setup-python.sh
   # Copy system configuration files (includes /etc/profile.d/intel-vaapi.sh)
   - type: files
     files:

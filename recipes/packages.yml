@@ -34,3 +34,8 @@ modules:
       - unzip
       - ripgrep
       - fd-find
+
+      # Python for homelab setup scripts
+      - python3                 # Python 3 interpreter
+      - python3-pip             # pip package manager
+      - python3-setuptools      # setuptools for package installation
