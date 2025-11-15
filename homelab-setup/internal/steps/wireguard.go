@@ -1,7 +1,9 @@
 package steps
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -433,6 +435,12 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 
 		peer, err := w.PromptForPeer(nextIP)
 		if err != nil {
+			// Check if the error is non-recoverable (e.g., EOF, input stream closed)
+			if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.ErrClosedPipe) {
+				w.ui.Error(fmt.Sprintf("Input stream closed: %v", err))
+				break
+			}
+			// For recoverable errors (e.g., validation errors), show warning and retry
 			w.ui.Warning(fmt.Sprintf("Failed to get peer configuration: %v", err))
 			continue
 		}
@@ -454,17 +462,16 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 			if len(parts) == 4 {
 				lastOctet := strings.Split(parts[3], "/")[0]
 				var octet int
-				fmt.Sscanf(lastOctet, "%d", &octet)
-				octet++
-				if octet > 254 {
-					w.ui.Warning("Maximum number of peers reached (254). Cannot assign more unique IP addresses in this subnet.")
 				if _, err := fmt.Sscanf(lastOctet, "%d", &octet); err != nil {
 					w.ui.Warning(fmt.Sprintf("Failed to parse last octet '%s': %v", lastOctet, err))
-					// Optionally, skip incrementing or set a sensible default, e.g. octet = 1
-					// continue
+					// Skip incrementing on parse error
 				} else {
 					octet++
-					nextIP = fmt.Sprintf("%s.%s.%s.%d/32", parts[0], parts[1], parts[2], octet)
+					if octet > 254 {
+						w.ui.Warning("Maximum number of peers reached (254). Cannot assign more unique IP addresses in this subnet.")
+					} else {
+						nextIP = fmt.Sprintf("%s.%s.%s.%d/32", parts[0], parts[1], parts[2], octet)
+					}
 				}
 			}
 		}
