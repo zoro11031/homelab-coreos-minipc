@@ -330,6 +330,16 @@ func (w *WireGuardSetup) PromptForPeer(nextIP string) (*WireGuardPeer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to prompt for allowed IPs: %w", err)
 	}
+	if allowedIPs == "" {
+		return nil, fmt.Errorf("allowed IPs are required")
+	}
+	// Validate each CIDR in AllowedIPs (comma-separated)
+	for _, cidr := range strings.Split(allowedIPs, ",") {
+		cidr = strings.TrimSpace(cidr)
+		if err := common.ValidateCIDR(cidr); err != nil {
+			return nil, fmt.Errorf("invalid allowed IPs CIDR '%s': %v", cidr, err)
+		}
+	}
 	peer.AllowedIPs = allowedIPs
 
 	// Prompt for endpoint (optional)
