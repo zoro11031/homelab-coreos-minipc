@@ -80,6 +80,40 @@ func (w *WireGuardSetup) configDir() string {
 	return w.config.GetOrDefault("WIREGUARD_CONFIG_DIR", "/etc/wireguard")
 }
 
+// incrementIP increments the last octet of an IP address in CIDR notation.
+// For example, "10.253.0.2/32" becomes "10.253.0.3/32".
+// Returns an error if the IP format is invalid or the last octet would exceed 254.
+func incrementIP(ip string) (string, error) {
+	if !strings.Contains(ip, "/") {
+		return "", fmt.Errorf("IP address must be in CIDR notation (e.g., 10.0.0.1/32)")
+	}
+
+	parts := strings.Split(ip, ".")
+	if len(parts) != 4 {
+		return "", fmt.Errorf("invalid IP address format: %s", ip)
+	}
+
+	// Extract the last octet and CIDR suffix
+	lastPart := parts[3]
+	lastOctetStr := strings.Split(lastPart, "/")[0]
+	cidrSuffix := ""
+	if slashIdx := strings.Index(lastPart, "/"); slashIdx != -1 {
+		cidrSuffix = lastPart[slashIdx:]
+	}
+
+	var octet int
+	if _, err := fmt.Sscanf(lastOctetStr, "%d", &octet); err != nil {
+		return "", fmt.Errorf("failed to parse last octet '%s': %w", lastOctetStr, err)
+	}
+
+	octet++
+	if octet > 254 {
+		return "", fmt.Errorf("cannot increment IP: last octet would exceed 254")
+	}
+
+	return fmt.Sprintf("%s.%s.%s.%d%s", parts[0], parts[1], parts[2], octet, cidrSuffix), nil
+}
+
 // PromptForWireGuard asks if the user wants to configure WireGuard
 func (w *WireGuardSetup) PromptForWireGuard() (bool, error) {
 	w.ui.Info("WireGuard is a modern, fast VPN protocol")
@@ -333,9 +367,6 @@ func (w *WireGuardSetup) PromptForPeer(nextIP string) (*WireGuardPeer, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to prompt for peer name: %w", err)
 	}
-	if name == "" {
-		return nil, fmt.Errorf("peer name is required")
-	}
 	peer.Name = name
 
 	// Prompt for public key
@@ -352,16 +383,6 @@ func (w *WireGuardSetup) PromptForPeer(nextIP string) (*WireGuardPeer, error) {
 	allowedIPs, err := w.ui.PromptInput("Allowed IPs for this peer", nextIP)
 	if err != nil {
 		return nil, fmt.Errorf("failed to prompt for allowed IPs: %w", err)
-	}
-	if allowedIPs == "" {
-		return nil, fmt.Errorf("allowed IPs are required")
-	}
-	// Validate each CIDR in AllowedIPs (comma-separated)
-	for _, cidr := range strings.Split(allowedIPs, ",") {
-		cidr = strings.TrimSpace(cidr)
-		if err := common.ValidateCIDR(cidr); err != nil {
-			return nil, fmt.Errorf("invalid allowed IPs CIDR '%s': %v", cidr, err)
-		}
 	}
 	peer.AllowedIPs = allowedIPs
 
@@ -438,11 +459,14 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 	// For example, if server is 10.253.0.1/24, suggest 10.253.0.2/32 for first peer
 	nextIP := "10.253.0.2/32"
 	if strings.Contains(interfaceIP, "/") {
+		// Start with the interface IP and increment to get the first peer IP
+		// Convert /24 (or other CIDR) to /32 for peer
 		parts := strings.Split(interfaceIP, "/")
-		if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
-			ipParts := strings.Split(parts[0], ".")
-			if len(ipParts) == 4 {
-				nextIP = fmt.Sprintf("%s.%s.%s.2/32", ipParts[0], ipParts[1], ipParts[2])
+		if len(parts) > 0 {
+			baseIP := parts[0] + "/32"
+			// Increment from server IP (e.g., 10.253.0.1/32 → 10.253.0.2/32)
+			if incremented, err := incrementIP(baseIP); err == nil {
+				nextIP = incremented
 			}
 		} else {
 			// Malformed interfaceIP, fallback to default suggestion
@@ -469,33 +493,16 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 
 		if err := w.AddPeerToConfig(interfaceName, peer); err != nil {
 			w.ui.Warning(fmt.Sprintf("Failed to add peer: %v", err))
-			retry, err := w.ui.PromptYesNo("Failed to add peer. Would you like to retry?", true)
-			if err != nil || !retry {
-				break
-			}
 			continue
 		}
 
 		peerCount++
 
 		// Increment suggested IP for next peer
-		if strings.Contains(nextIP, "/32") {
-			parts := strings.Split(nextIP, ".")
-			if len(parts) == 4 {
-				lastOctet := strings.Split(parts[3], "/")[0]
-				var octet int
-				if _, err := fmt.Sscanf(lastOctet, "%d", &octet); err != nil {
-					w.ui.Warning(fmt.Sprintf("Failed to parse last octet '%s': %v", lastOctet, err))
-					// Skip incrementing on parse error
-				} else {
-					octet++
-					if octet > 254 {
-						w.ui.Warning("Maximum number of peers reached (254). Cannot assign more unique IP addresses in this subnet.")
-					} else {
-						nextIP = fmt.Sprintf("%s.%s.%s.%d/32", parts[0], parts[1], parts[2], octet)
-					}
-				}
-			}
+		if incremented, err := incrementIP(nextIP); err == nil {
+			nextIP = incremented
+		} else {
+			w.ui.Warning(fmt.Sprintf("Failed to increment IP: %v", err))
 		}
 
 		w.ui.Print("")
@@ -511,11 +518,7 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 
 		// Check if service is running and offer to restart
 		serviceName := fmt.Sprintf("wg-quick@%s.service", interfaceName)
-		active, err := w.services.IsActive(serviceName)
-		if err != nil {
-			w.ui.Warning(fmt.Sprintf("Could not determine service status for %s: %v", serviceName, err))
-			w.ui.Infof("You may need to manually restart the service: sudo systemctl restart %s", serviceName)
-		}
+		active, _ := w.services.IsActive(serviceName)
 
 		if active {
 			w.ui.Print("")
@@ -530,11 +533,6 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 					w.ui.Success("Service restarted successfully")
 				}
 			}
-		} else {
-			w.ui.Print("")
-			w.ui.Info("The WireGuard service is not currently running.")
-			w.ui.Info("To apply the peer changes, start the service manually:")
-			w.ui.Infof("  sudo systemctl start wg-quick@%s", interfaceName)
 		}
 	}
 
