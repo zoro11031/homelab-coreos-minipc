@@ -453,7 +453,18 @@ func (w *WireGuardSetup) AddPeerToConfig(interfaceName string, peer *WireGuardPe
 	return nil
 }
 
-// AddPeers interactively adds WireGuard peers
+// AddPeers interactively adds WireGuard peers to the WireGuard configuration.
+//
+// Workflow:
+//   - Prompts the user to decide whether to add peers now.
+//   - If the user declines, the function returns early with nil error and provides instructions
+//     for manual peer addition and service restart.
+//   - If the user agrees, enters an interactive loop to add one or more peers.
+//   - For each peer, automatically suggests the next available IP address.
+//   - After each peer is added, appends the peer configuration to the WireGuard config file.
+//   - After all peers are added, instructs the user to restart the WireGuard service for changes to take effect.
+//
+// Returns nil error if the user declines to add peers.
 func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) error {
 	w.ui.Print("")
 	w.ui.Info("WireGuard Peer Configuration:")
