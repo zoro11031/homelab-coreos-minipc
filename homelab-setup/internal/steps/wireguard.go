@@ -1,17 +1,17 @@
 package steps
 
 import (
-"errors"
-"fmt"
-"io"
-"os/exec"
-"path/filepath"
-"strings"
+	"errors"
+	"fmt"
+	"io"
+	"os/exec"
+	"path/filepath"
+	"strings"
 
-"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/common"
-"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
-"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/system"
-"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/ui"
+	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/common"
+	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
+	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/system"
+	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/ui"
 )
 
 // WireGuardConfig holds WireGuard configuration
