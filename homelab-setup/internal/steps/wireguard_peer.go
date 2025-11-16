@@ -311,10 +311,12 @@ func (w *WireGuardSetup) AddPeerWorkflow(opts *WireGuardPeerWorkflowOptions) err
 		}
 	}
 
-	var routeAll bool
-	if opts.ClientAllowedIPs != "" {
-		routeAll = false
+	// Validate that ClientAllowedIPs and RouteAll are not both set
+	if opts.ClientAllowedIPs != "" && opts.RouteAll != nil {
+		return fmt.Errorf("cannot specify both ClientAllowedIPs and RouteAll options - they are mutually exclusive")
 	}
+
+	var routeAll bool
 	if opts.RouteAll != nil {
 		routeAll = *opts.RouteAll
 	} else if opts.ClientAllowedIPs == "" {
@@ -470,14 +472,6 @@ func appendPeerBlock(existing, block string) string {
 		return block
 	}
 	return trimmed + "\n\n" + block + "\n"
-}
-
-func sanitizeConfigValue(val string) string {
-	// Remove newlines and carriage returns, and trim leading/trailing whitespace
-	val = strings.ReplaceAll(val, "\n", "")
-	val = strings.ReplaceAll(val, "\r", "")
-	val = strings.TrimSpace(val)
-	return val
 }
 
 func renderClientConfig(privateKey, address, dns, serverPublicKey, presharedKey, endpoint, allowedIPs string, keepalive int) string {

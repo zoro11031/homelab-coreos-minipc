@@ -160,6 +160,67 @@ ListenPort = 51820
 	}
 }
 
+func TestAddPeerWorkflowRejectsBothClientAllowedIPsAndRouteAll(t *testing.T) {
+	tmp := t.TempDir()
+	cfg := config.New(filepath.Join(tmp, "config.conf"))
+	if err := cfg.Set("WIREGUARD_CONFIG_DIR", tmp); err != nil {
+		t.Fatalf("failed to set config dir: %v", err)
+	}
+	if err := cfg.Set("WIREGUARD_INTERFACE", "wg0"); err != nil {
+		t.Fatalf("failed to set interface: %v", err)
+	}
+	if err := cfg.Set("WIREGUARD_PUBLIC_KEY", "server-pub"); err != nil {
+		t.Fatalf("failed to set public key: %v", err)
+	}
+
+	packages := system.NewPackageManager()
+	services := system.NewServiceManager()
+	fs := system.NewFileSystem()
+	network := system.NewNetwork()
+	markers := config.NewMarkers(tmp)
+	buf := &bytes.Buffer{}
+	testUI := ui.NewWithWriter(buf)
+	testUI.SetNonInteractive(true)
+
+	setup := NewWireGuardSetup(packages, services, fs, network, cfg, testUI, markers)
+	fakeGen := &fakeKeyGenerator{}
+	setup.SetKeyGenerator(fakeGen)
+
+	serverConfig := `[Interface]
+Address = 10.253.0.1/24
+PrivateKey = server-private
+ListenPort = 51820
+`
+	configPath := filepath.Join(tmp, "wg0.conf")
+	if err := os.WriteFile(configPath, []byte(serverConfig), 0600); err != nil {
+		t.Fatalf("failed to write server config: %v", err)
+	}
+
+	// Test that providing both ClientAllowedIPs and RouteAll returns an error
+	routeAll := true
+	opts := &WireGuardPeerWorkflowOptions{
+		InterfaceName:              "wg0",
+		PeerName:                   "laptop",
+		Endpoint:                   "vpn.example.com:51820",
+		DNS:                        "1.1.1.1",
+		ClientAllowedIPs:           "10.0.0.0/8",
+		RouteAll:                   &routeAll,
+		OutputDir:                  filepath.Join(tmp, "export"),
+		PersistentKeepaliveSeconds: 30,
+		NonInteractive:             true,
+		SkipQRCode:                 true,
+		SkipServiceRestart:         true,
+	}
+
+	err := setup.AddPeerWorkflow(opts)
+	if err == nil {
+		t.Fatal("expected error when both ClientAllowedIPs and RouteAll are set, got nil")
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Fatalf("expected error message to mention 'mutually exclusive', got: %v", err)
+	}
+}
+
 func boolPtr(v bool) *bool {
 	return &v
 }
