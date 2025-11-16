@@ -15,15 +15,17 @@ type SetupContext struct {
 	Markers *config.Markers
 	UI      *ui.UI
 	Steps   *StepManager
+	// SkipWireGuard indicates whether WireGuard should be skipped when running all steps
+	SkipWireGuard bool
 }
 
 // NewSetupContext creates a new SetupContext with all dependencies initialized
 func NewSetupContext() (*SetupContext, error) {
-	return NewSetupContextWithOptions(false)
+	return NewSetupContextWithOptions(false, false)
 }
 
 // NewSetupContextWithOptions creates a new SetupContext with custom options
-func NewSetupContextWithOptions(nonInteractive bool) (*SetupContext, error) {
+func NewSetupContextWithOptions(nonInteractive bool, skipWireGuard bool) (*SetupContext, error) {
 	// Initialize configuration
 	cfg := config.New("")
 	if err := cfg.Load(); err != nil {
@@ -59,10 +61,11 @@ func NewSetupContextWithOptions(nonInteractive bool) (*SetupContext, error) {
 	)
 
 	return &SetupContext{
-		Config:  cfg,
-		Markers: markers,
-		UI:      uiInstance,
-		Steps:   stepMgr,
+		Config:        cfg,
+		Markers:       markers,
+		UI:            uiInstance,
+		Steps:         stepMgr,
+		SkipWireGuard: skipWireGuard,
 	}, nil
 }
 
@@ -208,7 +211,7 @@ func (sm *StepManager) RunStep(shortName string) error {
 
 // AddWireGuardPeer invokes the WireGuard peer workflow helper.
 func (sm *StepManager) AddWireGuardPeer(opts *steps.WireGuardPeerWorkflowOptions) error {
-return sm.wireguard.AddPeerWorkflow(opts)
+	return sm.wireguard.AddPeerWorkflow(opts)
 }
 
 // Individual step runners
