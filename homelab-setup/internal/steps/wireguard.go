@@ -95,10 +95,9 @@ func incrementIP(ip string) (string, error) {
 
 	// Extract the last octet and CIDR suffix
 	lastPart := parts[3]
-	lastOctetStr := strings.Split(lastPart, "/")[0]
-	cidrSuffix := ""
-	if slashIdx := strings.Index(lastPart, "/"); slashIdx != -1 {
-		cidrSuffix = lastPart[slashIdx:]
+	lastOctetStr, cidrSuffix, found := strings.Cut(lastPart, "/")
+	if !found {
+		return "", fmt.Errorf("invalid IP address format: missing CIDR suffix in '%s'", ip)
 	}
 
 	var octet int
