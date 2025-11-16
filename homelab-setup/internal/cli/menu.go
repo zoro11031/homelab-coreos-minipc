@@ -223,13 +223,13 @@ func (m *Menu) runTroubleshoot() error {
 }
 
 func (m *Menu) addWireGuardPeer() error {
-clearScreen()
-m.ctx.UI.Header("Add WireGuard Peer")
-err := m.ctx.Steps.AddWireGuardPeer(nil)
-m.ctx.UI.Print("")
-m.ctx.UI.Info("Press Enter to return to menu...")
-_, _ = fmt.Scanln()
-return err
+	clearScreen()
+	m.ctx.UI.Header("Add WireGuard Peer")
+	err := m.ctx.Steps.AddWireGuardPeer(nil)
+	m.ctx.UI.Print("")
+	m.ctx.UI.Info("Press Enter to return to menu...")
+	_, _ = fmt.Scanln()
+	return err
 }
 
 // showStatus shows the current setup status
