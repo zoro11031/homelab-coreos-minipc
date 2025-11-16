@@ -32,7 +32,7 @@ var wireguardAddPeerCmd = &cobra.Command{
 	Use:   "add-peer",
 	Short: "Add a WireGuard peer and export its config",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, err := cli.NewSetupContextWithOptions(addPeerNonInteractive)
+		ctx, err := cli.NewSetupContextWithOptions(addPeerNonInteractive, false)
 		if err != nil {
 			return fmt.Errorf("failed to initialize setup context: %w", err)
 		}
@@ -82,11 +82,11 @@ func init() {
 	wireguardAddPeerCmd.Flags().BoolVar(&addPeerNoPSK, "no-psk", false, "Skip preshared key generation")
 	wireguardAddPeerCmd.Flags().StringVar(&addPeerPresharedKey, "preshared-key", "", "Provide an explicit preshared key")
 	wireguardAddPeerCmd.Flags().BoolVar(&addPeerNonInteractive, "non-interactive", false, "Run without prompts (requires values)")
-wireguardAddPeerCmd.Flags().BoolVar(&addPeerSkipQR, "no-qr", false, "Skip QR output (for CI/testing)")
-if err := wireguardAddPeerCmd.Flags().MarkHidden("no-qr"); err != nil {
-	fmt.Printf("Warning: could not hide 'no-qr' flag: %v\n", err)
-}
+	wireguardAddPeerCmd.Flags().BoolVar(&addPeerSkipQR, "no-qr", false, "Skip QR output (for CI/testing)")
+	if err := wireguardAddPeerCmd.Flags().MarkHidden("no-qr"); err != nil {
+		fmt.Printf("Warning: could not hide 'no-qr' flag: %v\n", err)
+	}
 
-wireguardCmd.AddCommand(wireguardAddPeerCmd)
-rootCmd.AddCommand(wireguardCmd)
+	wireguardCmd.AddCommand(wireguardAddPeerCmd)
+	rootCmd.AddCommand(wireguardCmd)
 }
