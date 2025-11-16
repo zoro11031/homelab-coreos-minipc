@@ -159,6 +159,7 @@ func nextPeerAddress(interfaceCIDR string, used map[string]struct{}) (string, er
 		usedMap[k] = struct{}{}
 	}
 	usedMap[fmt.Sprintf("%s/32", serverIP.String())] = struct{}{}
+	usedMap[serverIP.String()] = struct{}{}
 	for i := 0; i < total; i++ {
 		if !network.Contains(current) {
 			break
