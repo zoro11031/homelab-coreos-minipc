@@ -356,7 +356,17 @@ func (w *WireGuardSetup) EnableService(interfaceName string) error {
 	return nil
 }
 
-// PromptForPeer prompts for peer configuration
+// PromptForPeer prompts for peer configuration.
+//
+// Validation performed:
+//   - Prompts for peer name, public key, allowed IPs, and endpoint.
+//   - Returns an error if any prompt fails (e.g., EOF, user abort).
+//   - Returns an error if the public key is empty.
+// Note:
+//   - Peer name sanitization is performed in the caller (AddPeerToConfig).
+// Return value:
+//   - Returns a WireGuardPeer and nil error on success.
+//   - Returns nil and an error for non-recoverable input errors (such as EOF).
 func (w *WireGuardSetup) PromptForPeer(nextIP string) (*WireGuardPeer, error) {
 	peer := &WireGuardPeer{}
 
