@@ -49,18 +49,39 @@ func sanitizePeerName(name string) string {
 	name = strings.ReplaceAll(name, "\n", "")
 	name = strings.ReplaceAll(name, "\r", "")
 	name = strings.ReplaceAll(name, "\t", " ")
-	
+
 	// Remove brackets that could be used to inject sections
 	name = strings.ReplaceAll(name, "[", "")
 	name = strings.ReplaceAll(name, "]", "")
-	
+
 	// Remove hash/pound sign to prevent comment injection
 	name = strings.ReplaceAll(name, "#", "")
-	
+
 	// Trim whitespace
 	name = strings.TrimSpace(name)
-	
+
 	return name
+}
+
+// sanitizeConfigValue removes characters that could break the WireGuard config format
+// or be used to inject additional configuration directives. This is critical for values
+// like PublicKey, AllowedIPs, and Endpoint that are written directly to the config file.
+func sanitizeConfigValue(value string) string {
+	// Remove newlines and carriage returns to prevent config injection
+	value = strings.ReplaceAll(value, "\n", "")
+	value = strings.ReplaceAll(value, "\r", "")
+
+	// Remove brackets that could be used to inject sections
+	value = strings.ReplaceAll(value, "[", "")
+	value = strings.ReplaceAll(value, "]", "")
+
+	// Remove hash/pound sign to prevent comment injection
+	value = strings.ReplaceAll(value, "#", "")
+
+	// Trim whitespace
+	value = strings.TrimSpace(value)
+
+	return value
 }
 
 // NewWireGuardSetup creates a new WireGuardSetup instance
@@ -361,8 +382,10 @@ func (w *WireGuardSetup) EnableService(interfaceName string) error {
 //   - Prompts for peer name, public key, allowed IPs, and endpoint.
 //   - Returns an error if any prompt fails (e.g., EOF, user abort).
 //   - Returns an error if the public key is empty.
+//
 // Note:
 //   - Peer name sanitization is performed in the caller (AddPeerToConfig).
+//
 // Return value:
 //   - Returns a WireGuardPeer and nil error on success.
 //   - Returns nil and an error for non-recoverable input errors (such as EOF).
@@ -420,7 +443,8 @@ func (w *WireGuardSetup) PromptForPeer(nextIP string) (*WireGuardPeer, error) {
 //
 // Security considerations:
 // - Uses `sudo cat` to read the config file to handle permissions; this requires the user to have passwordless sudo access for `cat`.
-// - The peer name is sanitized to prevent config injection or malicious input from affecting the config file.
+// - All peer fields (Name, PublicKey, AllowedIPs, Endpoint) are sanitized to prevent config injection attacks.
+// - Sanitization removes newlines, brackets, and hash characters that could be used to inject malicious configuration directives.
 // - The function appends the new peer configuration to the existing config file rather than replacing the entire file, preserving existing peers.
 func (w *WireGuardSetup) AddPeerToConfig(interfaceName string, peer *WireGuardPeer) error {
 	configPath := filepath.Join(w.configDir(), fmt.Sprintf("%s.conf", interfaceName))
@@ -432,13 +456,16 @@ func (w *WireGuardSetup) AddPeerToConfig(interfaceName string, peer *WireGuardPe
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	// Build peer section with sanitized name to prevent config injection
+	// Build peer section with sanitized values to prevent config injection
 	sanitizedName := sanitizePeerName(peer.Name)
+	sanitizedPublicKey := sanitizeConfigValue(peer.PublicKey)
+	sanitizedAllowedIPs := sanitizeConfigValue(peer.AllowedIPs)
 	peerSection := fmt.Sprintf("\n# Peer: %s\n[Peer]\nPublicKey = %s\nAllowedIPs = %s\n",
-		sanitizedName, peer.PublicKey, peer.AllowedIPs)
+		sanitizedName, sanitizedPublicKey, sanitizedAllowedIPs)
 
 	if peer.Endpoint != "" {
-		peerSection += fmt.Sprintf("Endpoint = %s\n", peer.Endpoint)
+		sanitizedEndpoint := sanitizeConfigValue(peer.Endpoint)
+		peerSection += fmt.Sprintf("Endpoint = %s\n", sanitizedEndpoint)
 	}
 
 	// Append peer to config
