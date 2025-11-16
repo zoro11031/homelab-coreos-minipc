@@ -83,7 +83,9 @@ func init() {
 	wireguardAddPeerCmd.Flags().StringVar(&addPeerPresharedKey, "preshared-key", "", "Provide an explicit preshared key")
 	wireguardAddPeerCmd.Flags().BoolVar(&addPeerNonInteractive, "non-interactive", false, "Run without prompts (requires values)")
 wireguardAddPeerCmd.Flags().BoolVar(&addPeerSkipQR, "no-qr", false, "Skip QR output (for CI/testing)")
-_ = wireguardAddPeerCmd.Flags().MarkHidden("no-qr")
+if err := wireguardAddPeerCmd.Flags().MarkHidden("no-qr"); err != nil {
+	fmt.Printf("Warning: could not hide 'no-qr' flag: %v\n", err)
+}
 
 wireguardCmd.AddCommand(wireguardAddPeerCmd)
 rootCmd.AddCommand(wireguardCmd)
