@@ -55,7 +55,7 @@ DerivePublicKey(privateKey string) (string, error)
 type CommandKeyGenerator struct{}
 
 // GenerateKeyPair produces a WireGuard key pair using "wg genkey".
-func (CommandKeyGenerator) GenerateKeyPair() (string, string, error) {
+func (kg CommandKeyGenerator) GenerateKeyPair() (string, string, error) {
 privCmd := exec.Command("wg", "genkey")
 privOutput, err := privCmd.Output()
 if err != nil {
@@ -63,7 +63,7 @@ return "", "", fmt.Errorf("failed to generate private key: %w", err)
 }
 privateKey := strings.TrimSpace(string(privOutput))
 
-pub, err := (CommandKeyGenerator{}).DerivePublicKey(privateKey)
+pub, err := kg.DerivePublicKey(privateKey)
 if err != nil {
 return "", "", err
 }
