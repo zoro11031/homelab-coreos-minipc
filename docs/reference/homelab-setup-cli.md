@@ -77,6 +77,17 @@ These scripts automate the complete setup of a homelab environment on **UBlue uC
 - Service status checks
 - Log collection
 
+### Add WireGuard peers after the fact
+
+WireGuard no longer requires rerunning the entire setup. Use the interactive menu entry `[P] Add WireGuard Peer` or run `homelab-setup wireguard add-peer` to append clients at any time. The workflow:
+
+- Reads `/etc/wireguard/<iface>.conf`, finds the next free `/32`, and appends a sanitized `[Peer]` block without touching existing peers.
+- Generates a full client `wg.conf` (private key, address, DNS, server public key, endpoint, AllowedIPs, and `PersistentKeepalive`). Files land in `~/setup/export/wireguard-peers/<peer>.conf` with `0600` permissions.
+- Prints the config to stdout and renders an ASCII QR code so phones can import it immediately. Install `qrencode` on the host to enable the QR renderer.
+- Offers to restart `wg-quick@<iface>` once the server config is updated.
+
+`homelab-setup wireguard add-peer --help` exposes flags for endpoint/DNS overrides, custom export directories, and non-interactive automation so CI can provision peers without prompts.
+
 ## System Requirements
 
 ### Operating System

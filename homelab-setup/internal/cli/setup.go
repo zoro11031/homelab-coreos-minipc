@@ -206,6 +206,11 @@ func (sm *StepManager) RunStep(shortName string) error {
 	return nil
 }
 
+// AddWireGuardPeer invokes the WireGuard peer workflow helper.
+func (sm *StepManager) AddWireGuardPeer(opts *steps.WireGuardPeerWorkflowOptions) error {
+return sm.wireguard.AddPeerWorkflow(opts)
+}
+
 // Individual step runners
 func (sm *StepManager) runPreflight() error {
 	// Check if already completed

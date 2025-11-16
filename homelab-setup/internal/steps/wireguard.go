@@ -1,17 +1,17 @@
 package steps
 
 import (
-	"errors"
-	"fmt"
-	"io"
-	"os/exec"
-	"path/filepath"
-	"strings"
+"errors"
+"fmt"
+"io"
+"os/exec"
+"path/filepath"
+"strings"
 
-	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/common"
-	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
-	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/system"
-	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/ui"
+"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/common"
+"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
+"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/system"
+"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/ui"
 )
 
 // WireGuardConfig holds WireGuard configuration
@@ -33,13 +33,62 @@ type WireGuardPeer struct {
 
 // WireGuardSetup handles WireGuard VPN setup
 type WireGuardSetup struct {
-	packages *system.PackageManager
-	services *system.ServiceManager
-	fs       *system.FileSystem
-	network  *system.Network
-	config   *config.Config
-	ui       *ui.UI
-	markers  *config.Markers
+packages *system.PackageManager
+services *system.ServiceManager
+fs       *system.FileSystem
+network  *system.Network
+config   *config.Config
+ui       *ui.UI
+markers  *config.Markers
+keygen   WireGuardKeyGenerator
+}
+
+// WireGuardKeyGenerator describes key generation/derivation helpers so the
+// workflow can be unit-tested without shelling out to the wg binary.
+type WireGuardKeyGenerator interface {
+GenerateKeyPair() (privateKey, publicKey string, err error)
+GeneratePresharedKey() (string, error)
+DerivePublicKey(privateKey string) (string, error)
+}
+
+// CommandKeyGenerator implements WireGuardKeyGenerator by calling wg commands.
+type CommandKeyGenerator struct{}
+
+// GenerateKeyPair produces a WireGuard key pair using "wg genkey".
+func (CommandKeyGenerator) GenerateKeyPair() (string, string, error) {
+privCmd := exec.Command("wg", "genkey")
+privOutput, err := privCmd.Output()
+if err != nil {
+return "", "", fmt.Errorf("failed to generate private key: %w", err)
+}
+privateKey := strings.TrimSpace(string(privOutput))
+
+pub, err := (CommandKeyGenerator{}).DerivePublicKey(privateKey)
+if err != nil {
+return "", "", err
+}
+return privateKey, pub, nil
+}
+
+// GeneratePresharedKey runs "wg genpsk".
+func (CommandKeyGenerator) GeneratePresharedKey() (string, error) {
+cmd := exec.Command("wg", "genpsk")
+output, err := cmd.Output()
+if err != nil {
+return "", fmt.Errorf("failed to generate preshared key: %w", err)
+}
+return strings.TrimSpace(string(output)), nil
+}
+
+// DerivePublicKey runs "wg pubkey" using the provided private key.
+func (CommandKeyGenerator) DerivePublicKey(privateKey string) (string, error) {
+pubCmd := exec.Command("wg", "pubkey")
+pubCmd.Stdin = strings.NewReader(privateKey)
+pubOutput, err := pubCmd.Output()
+if err != nil {
+return "", fmt.Errorf("failed to derive public key: %w", err)
+}
+return strings.TrimSpace(string(pubOutput)), nil
 }
 
 // sanitizePeerName removes or replaces characters that could break the WireGuard config format
@@ -86,15 +135,23 @@ func sanitizeConfigValue(value string) string {
 
 // NewWireGuardSetup creates a new WireGuardSetup instance
 func NewWireGuardSetup(packages *system.PackageManager, services *system.ServiceManager, fs *system.FileSystem, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers) *WireGuardSetup {
-	return &WireGuardSetup{
-		packages: packages,
-		services: services,
-		fs:       fs,
-		network:  network,
-		config:   cfg,
-		ui:       ui,
-		markers:  markers,
-	}
+return &WireGuardSetup{
+packages: packages,
+services: services,
+fs:       fs,
+network:  network,
+config:   cfg,
+ui:       ui,
+markers:  markers,
+keygen:   CommandKeyGenerator{},
+}
+}
+
+// SetKeyGenerator overrides the key generator implementation (used in tests).
+func (w *WireGuardSetup) SetKeyGenerator(gen WireGuardKeyGenerator) {
+if gen != nil {
+w.keygen = gen
+}
 }
 
 func (w *WireGuardSetup) configDir() string {

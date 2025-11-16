@@ -26,12 +26,13 @@ The menu gives you:
 [0-6] Run a specific step
 [T] Troubleshooting menu
 [S] Show setup status
+[P] Add WireGuard Peer (post-setup)
 ```
 
 ### What the wizard configures
 1. **Runtime + users:** pick Podman or Docker, optionally create a dedicated container user, and wire up UID/GID/subuid/subgid.
 2. **Directories:** `/srv/containers/{media,web,cloud}`, `/var/lib/containers/appdata`, `/mnt/nas-*` mount points, and compose/env scaffolding.
-3. **WireGuard:** key generation, interface templates, peer exports, and `wg-quick@wg0` units (skipped in Quick Setup).
+3. **WireGuard:** key generation, interface templates, peer exports, and `wg-quick@wg0` units. After the initial setup you can return to the menu (or run `homelab-setup wireguard add-peer`) to append additional peers. Each run writes a sanitized `[Peer]` block to `/etc/wireguard/<iface>.conf`, exports a ready-to-import client file under `~/setup/export/wireguard-peers/`, and prints both the config text and an ASCII QR code for mobile imports (install `qrencode` to enable the QR renderer).
 4. **NFS mounts:** server detection, mount tests, and systemd unit enablement.
 5. **Services:** copies compose files, collects Plex claims + service passwords, writes `.env` files, and launches the Podman stack via systemd.
 6. **Status + troubleshooting:** baked-in diagnostics and reset commands (`homelab-setup status|reset|troubleshoot`).

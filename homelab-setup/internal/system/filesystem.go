@@ -367,6 +367,26 @@ func (fs *FileSystem) WriteFile(path string, content []byte, perms os.FileMode) 
 	return fs.Chmod(path, perms)
 }
 
+// ReadFile reads a file, falling back to sudo when necessary. It returns the
+// raw contents as a byte slice.
+func (fs *FileSystem) ReadFile(path string) ([]byte, error) {
+        content, err := os.ReadFile(path)
+        if err == nil {
+                return content, nil
+        }
+
+        if !errors.Is(err, os.ErrPermission) {
+                return nil, fmt.Errorf("failed to read %s: %w", path, err)
+        }
+
+        cmd := exec.Command("sudo", "-n", "cat", path)
+        output, runErr := cmd.Output()
+        if runErr != nil {
+                return nil, fmt.Errorf("failed to read %s with sudo: %w", path, runErr)
+        }
+        return output, nil
+}
+
 // GetFileSize returns the size of a file in bytes
 func (fs *FileSystem) GetFileSize(path string) (int64, error) {
 	info, err := os.Stat(path)
