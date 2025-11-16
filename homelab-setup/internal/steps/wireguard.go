@@ -417,7 +417,12 @@ func (w *WireGuardSetup) PromptForPeer(nextIP string) (*WireGuardPeer, error) {
 	return peer, nil
 }
 
-// AddPeerToConfig appends a peer configuration to the WireGuard config file
+// AddPeerToConfig appends a peer configuration to the WireGuard config file.
+//
+// Security considerations:
+// - Uses `sudo cat` to read the config file to handle permissions; this requires the user to have passwordless sudo access for `cat`.
+// - The peer name is sanitized to prevent config injection or malicious input from affecting the config file.
+// - The function appends the new peer configuration to the existing config file rather than replacing the entire file, preserving existing peers.
 func (w *WireGuardSetup) AddPeerToConfig(interfaceName string, peer *WireGuardPeer) error {
 	configPath := filepath.Join(w.configDir(), fmt.Sprintf("%s.conf", interfaceName))
 
