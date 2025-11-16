@@ -123,11 +123,14 @@ func (m *Menu) displayMenu() {
 	bold.Print("  [T] ")
 	fmt.Println("Troubleshooting Tool")
 
-	bold.Print("  [S] ")
-	fmt.Println("Show Setup Status")
+bold.Print("  [S] ")
+fmt.Println("Show Setup Status")
 
-	bold.Print("  [R] ")
-	fmt.Println("Reset Setup (Clear markers)")
+bold.Print("  [P] ")
+fmt.Println("Add WireGuard Peer")
+
+bold.Print("  [R] ")
+fmt.Println("Reset Setup (Clear markers)")
 
 	bold.Print("  [H] ")
 	fmt.Println("Help")
@@ -148,10 +151,12 @@ func (m *Menu) handleChoice(choice string) error {
 		return m.runIndividualStep(choice)
 	case "T":
 		return m.runTroubleshoot()
-	case "S":
-		return m.showStatus()
-	case "R":
-		return m.resetSetup()
+		case "S":
+			return m.showStatus()
+		case "P":
+			return m.addWireGuardPeer()
+		case "R":
+			return m.resetSetup()
 	case "H":
 		return m.showHelp()
 	case "X":
@@ -215,6 +220,16 @@ func (m *Menu) runTroubleshoot() error {
 	_, _ = fmt.Scanln()
 
 	return nil
+}
+
+func (m *Menu) addWireGuardPeer() error {
+	clearScreen()
+	m.ctx.UI.Header("Add WireGuard Peer")
+	err := m.ctx.Steps.AddWireGuardPeer(nil)
+	m.ctx.UI.Print("")
+	m.ctx.UI.Info("Press Enter to return to menu...")
+	_, _ = fmt.Scanln()
+	return err
 }
 
 // showStatus shows the current setup status

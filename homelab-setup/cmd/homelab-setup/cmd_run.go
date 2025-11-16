@@ -49,8 +49,8 @@ func init() {
 }
 
 func runSetup(cmd *cobra.Command, args []string) error {
-	// Create setup context with non-interactive and dry-run modes if requested
-	ctx, err := cli.NewSetupContextWithOptions(nonInteractive, dryRun)
+	// Create setup context with non-interactive mode if requested
+	ctx, err := cli.NewSetupContextWithOptions(nonInteractive, skipWireguard)
 	if err != nil {
 		return fmt.Errorf("failed to initialize setup context: %w", err)
 	}

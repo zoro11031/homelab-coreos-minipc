@@ -334,8 +334,16 @@ func (fs *FileSystem) CreateSymlink(target, linkPath string) error {
 	return nil
 }
 
-// WriteFile writes content to a file with sudo
+// WriteFile writes content to a file. It first attempts a direct write using the
+// current user's permissions and only falls back to sudo if that fails with
+// os.ErrPermission.
 func (fs *FileSystem) WriteFile(path string, content []byte, perms os.FileMode) error {
+	if err := fs.writeFileDirect(path, content, perms); err == nil {
+		return nil
+	} else if !errors.Is(err, os.ErrPermission) {
+		return err
+	}
+
 	// Create temporary file
 	tmpFile, err := os.CreateTemp("", "homelab-setup-*")
 	if err != nil {
@@ -365,6 +373,62 @@ func (fs *FileSystem) WriteFile(path string, content []byte, perms os.FileMode) 
 
 	// Set permissions
 	return fs.Chmod(path, perms)
+}
+
+// writeFileDirect attempts to write the file without sudo by creating a
+// temporary file in the target directory and renaming it into place.
+func (fs *FileSystem) writeFileDirect(path string, content []byte, perms os.FileMode) error {
+	dir := filepath.Dir(path)
+	tmpFile, err := os.CreateTemp(dir, "homelab-setup-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temp file in %s: %w", dir, err)
+	}
+	tmpPath := tmpFile.Name()
+	cleanup := true
+	defer func() {
+		if cleanup {
+			os.Remove(tmpPath)
+		}
+	}()
+
+	if _, err := tmpFile.Write(content); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to write to temp file: %w", err)
+	}
+	if err := tmpFile.Chmod(perms); err != nil {
+		tmpFile.Close()
+		return fmt.Errorf("failed to set temp file permissions: %w", err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temp file: %w", err)
+	}
+
+	if err := os.Rename(tmpPath, path); err != nil {
+		return fmt.Errorf("failed to rename temp file to %s: %w", path, err)
+	}
+
+	cleanup = false
+	return nil
+}
+
+// ReadFile reads a file, falling back to sudo when necessary. It returns the
+// raw contents as a byte slice.
+func (fs *FileSystem) ReadFile(path string) ([]byte, error) {
+	content, err := os.ReadFile(path)
+	if err == nil {
+		return content, nil
+	}
+
+	if !errors.Is(err, os.ErrPermission) {
+		return nil, fmt.Errorf("failed to read %s: %w", path, err)
+	}
+
+	cmd := exec.Command("sudo", "-n", "cat", path)
+	output, runErr := cmd.Output()
+	if runErr != nil {
+		return nil, fmt.Errorf("failed to read %s with sudo: %w", path, runErr)
+	}
+	return output, nil
 }
 
 // GetFileSize returns the size of a file in bytes

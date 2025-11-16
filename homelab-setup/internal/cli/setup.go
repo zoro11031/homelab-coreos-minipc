@@ -15,7 +15,8 @@ type SetupContext struct {
 	Markers *config.Markers
 	UI      *ui.UI
 	Steps   *StepManager
-	DryRun  bool // If true, preview actions without executing
+	// SkipWireGuard indicates whether WireGuard should be skipped when running all steps
+	SkipWireGuard bool
 }
 
 // NewSetupContext creates a new SetupContext with all dependencies initialized
@@ -24,7 +25,7 @@ func NewSetupContext() (*SetupContext, error) {
 }
 
 // NewSetupContextWithOptions creates a new SetupContext with custom options
-func NewSetupContextWithOptions(nonInteractive bool, dryRun bool) (*SetupContext, error) {
+func NewSetupContextWithOptions(nonInteractive bool, skipWireGuard bool) (*SetupContext, error) {
 	// Initialize configuration
 	cfg := config.New("")
 	if err := cfg.Load(); err != nil {
@@ -59,22 +60,13 @@ func NewSetupContextWithOptions(nonInteractive bool, dryRun bool) (*SetupContext
 		services,
 	)
 
-	ctx := &SetupContext{
-		Config:  cfg,
-		Markers: markers,
-		UI:      uiInstance,
-		Steps:   stepMgr,
-		DryRun:  dryRun,
-	}
-
-	// Show dry-run notice
-	if dryRun {
-		uiInstance.Warning("DRY-RUN MODE: No changes will be made to the system")
-		uiInstance.Info("This will preview what would be done without executing")
-		uiInstance.Print("")
-	}
-
-	return ctx, nil
+	return &SetupContext{
+		Config:        cfg,
+		Markers:       markers,
+		UI:            uiInstance,
+		Steps:         stepMgr,
+		SkipWireGuard: skipWireGuard,
+	}, nil
 }
 
 // StepManager manages all setup steps
@@ -224,6 +216,11 @@ func (sm *StepManager) RunStep(shortName string) error {
 
 	sm.ui.Success(fmt.Sprintf("Step '%s' completed successfully!", shortName))
 	return nil
+}
+
+// AddWireGuardPeer invokes the WireGuard peer workflow helper.
+func (sm *StepManager) AddWireGuardPeer(opts *steps.WireGuardPeerWorkflowOptions) error {
+	return sm.wireguard.AddPeerWorkflow(opts)
 }
 
 // Individual step runners
