@@ -135,16 +135,16 @@ func sanitizeConfigValue(value string) string {
 
 // NewWireGuardSetup creates a new WireGuardSetup instance
 func NewWireGuardSetup(packages *system.PackageManager, services *system.ServiceManager, fs *system.FileSystem, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers) *WireGuardSetup {
-return &WireGuardSetup{
-packages: packages,
-services: services,
-fs:       fs,
-network:  network,
-config:   cfg,
-ui:       ui,
-markers:  markers,
-keygen:   CommandKeyGenerator{},
-}
+	return &WireGuardSetup{
+		packages: packages,
+		services: services,
+		fs:       fs,
+		network:  network,
+		config:   cfg,
+		ui:       ui,
+		markers:  markers,
+		keygen:   CommandKeyGenerator{},
+	}
 }
 
 // SetKeyGenerator overrides the key generator implementation (used in tests).
