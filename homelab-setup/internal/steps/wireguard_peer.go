@@ -23,7 +23,7 @@ type WireGuardPeerWorkflowOptions struct {
 	ClientAllowedIPs           string
 	RouteAll                   *bool
 	OutputDir                  string
-	PersistentKeepaliveSeconds int
+	PersistentKeepaliveSeconds *int
 	GeneratePresharedKey       *bool
 	ProvidedPresharedKey       string
 	NonInteractive             bool
@@ -108,20 +108,62 @@ func firstInterfaceAddress(cfg *parsedWireGuardConfig) (string, error) {
 func collectUsedPeerIPs(cfg *parsedWireGuardConfig) map[string]struct{} {
 	used := make(map[string]struct{})
 	for _, peer := range cfg.Peers {
-		allowed, ok := peer.Values["AllowedIPs"]
+		allowed, ok := lookupPeerValue(peer.Values, "AllowedIPs")
 		if !ok {
 			continue
 		}
 		entries := strings.Split(allowed, ",")
-		if len(entries) == 0 {
-			continue
-		}
-		candidate := strings.TrimSpace(entries[0])
-		if candidate != "" {
-			used[candidate] = struct{}{}
+		for _, entry := range entries {
+			canonical, ipStr, ok := normalizeAllowedIPToken(entry)
+			if !ok {
+				continue
+			}
+			if canonical != "" {
+				used[canonical] = struct{}{}
+			}
+			if ipStr != "" {
+				used[ipStr] = struct{}{}
+			}
 		}
 	}
 	return used
+}
+
+func lookupPeerValue(values map[string]string, target string) (string, bool) {
+	for key, value := range values {
+		if strings.EqualFold(key, target) {
+			return value, true
+		}
+	}
+	return "", false
+}
+
+func normalizeAllowedIPToken(entry string) (string, string, bool) {
+	cleaned := strings.TrimSpace(entry)
+	if idx := strings.IndexAny(cleaned, "#;"); idx >= 0 {
+		cleaned = strings.TrimSpace(cleaned[:idx])
+	}
+	if cleaned == "" {
+		return "", "", false
+	}
+	if strings.Contains(cleaned, "/") {
+		ip, network, err := net.ParseCIDR(cleaned)
+		if err != nil {
+			return "", "", false
+		}
+		ones, _ := network.Mask.Size()
+		canonical := fmt.Sprintf("%s/%d", network.IP.String(), ones)
+		return canonical, ip.String(), true
+	}
+	ip := net.ParseIP(cleaned)
+	if ip == nil {
+		return "", "", false
+	}
+	canonical := ip.String()
+	if ip.To4() != nil {
+		canonical = fmt.Sprintf("%s/32", ip.String())
+	}
+	return canonical, ip.String(), true
 }
 
 func deriveNetworkCIDR(address string) (string, *net.IPNet, net.IP, error) {
@@ -144,11 +186,6 @@ func nextPeerAddress(interfaceCIDR string, used map[string]struct{}) (string, er
 		return "", fmt.Errorf("only IPv4 addresses are supported for auto-allocation")
 	}
 	total := 1 << uint(32-ones)
-	// Early check for impractically large subnets
-	const maxSubnetSize = 4096 // Limit to /20 or smaller
-	if total > maxSubnetSize {
-		return "", fmt.Errorf("subnet too large (%d addresses). Please use a smaller subnet (e.g., /24 or /20)", total)
-	}
 	current := make(net.IP, len(network.IP))
 	copy(current, network.IP)
 	// skip network address
@@ -339,9 +376,13 @@ func (w *WireGuardSetup) AddPeerWorkflow(opts *WireGuardPeerWorkflowOptions) err
 		}
 	}
 
-	keepalive := opts.PersistentKeepaliveSeconds
-	if keepalive == 0 {
-		keepalive = 25
+	keepalive := 25
+	if opts.PersistentKeepaliveSeconds != nil {
+		if *opts.PersistentKeepaliveSeconds <= 0 {
+			keepalive = 0
+		} else {
+			keepalive = *opts.PersistentKeepaliveSeconds
+		}
 	}
 
 	serverPublicKey := strings.TrimSpace(w.config.GetOrDefault("WIREGUARD_PUBLIC_KEY", ""))
@@ -395,32 +436,29 @@ func (w *WireGuardSetup) AddPeerWorkflow(opts *WireGuardPeerWorkflowOptions) err
 		}
 	}
 
-	serverBlock := buildServerPeerBlock(peerName, clientPublic, presharedKey, nextIP, keepalive)
-	newConfig := appendPeerBlock(string(rawConfig), serverBlock)
-	if err := w.fs.WriteFile(configPath, []byte(newConfig), 0600); err != nil {
-		return fmt.Errorf("failed to update %s: %w", configPath, err)
-	}
-
 	clientConfig := renderClientConfig(clientPrivate, nextIP, dns, serverPublicKey, presharedKey, endpoint, clientAllowed, keepalive)
 	exportDir := opts.OutputDir
 	if exportDir == "" {
 		exportDir = defaultPeerExportDir()
 	}
-	if err := os.MkdirAll(exportDir, 0700); err != nil {
-		return fmt.Errorf("failed to create export directory: %w", err)
-	}
-	if err := os.Chmod(exportDir, 0700); err != nil {
-		return fmt.Errorf("failed to set export directory permissions: %w", err)
+	exportPath, err := writeClientConfigExport(peerName, exportDir, clientConfig)
+	if err != nil {
+		w.ui.Warningf("Failed to export client config: %v", err)
+		w.ui.Info("Client configuration (not exported):")
+		w.ui.Print(clientConfig)
+		return fmt.Errorf("failed to export client config: %w", err)
 	}
 
-	fileBase := safePeerFilename(peerName)
-	fileName := fmt.Sprintf("%s.conf", fileBase)
-	exportPath := filepath.Join(exportDir, fileName)
-	if _, err := os.Stat(exportPath); err == nil {
-		exportPath = filepath.Join(exportDir, fmt.Sprintf("%s-%d.conf", fileBase, time.Now().Unix()))
+	var qrOutput string
+	var qrErr error
+	if !opts.SkipQRCode {
+		qrOutput, qrErr = renderASCIIQRCode(clientConfig)
 	}
-	if err := os.WriteFile(exportPath, []byte(clientConfig), 0600); err != nil {
-		return fmt.Errorf("failed to write client config: %w", err)
+
+	serverBlock := buildServerPeerBlock(peerName, clientPublic, presharedKey, nextIP, keepalive)
+	newConfig := appendPeerBlock(string(rawConfig), serverBlock)
+	if err := w.fs.WriteFile(configPath, []byte(newConfig), 0600); err != nil {
+		return fmt.Errorf("failed to update %s: %w", configPath, err)
 	}
 
 	w.ui.Successf("Peer %s added. Client config: %s", peerName, exportPath)
@@ -429,12 +467,11 @@ func (w *WireGuardSetup) AddPeerWorkflow(opts *WireGuardPeerWorkflowOptions) err
 	w.ui.Print(clientConfig)
 
 	if !opts.SkipQRCode {
-		qr, qrErr := renderASCIIQRCode(clientConfig)
 		if qrErr != nil {
 			w.ui.Warningf("Failed to render QR code: %v", qrErr)
 		} else {
 			w.ui.Info("Scan this QR code from the WireGuard mobile app:")
-			w.ui.Print(qr)
+			w.ui.Print(qrOutput)
 		}
 	}
 
@@ -451,6 +488,29 @@ func (w *WireGuardSetup) AddPeerWorkflow(opts *WireGuardPeerWorkflowOptions) err
 	}
 
 	return nil
+}
+
+var clientConfigFileWriter = func(path string, data []byte, perm os.FileMode) error {
+	return os.WriteFile(path, data, perm)
+}
+
+func writeClientConfigExport(peerName, exportDir, clientConfig string) (string, error) {
+	if err := os.MkdirAll(exportDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to create export directory: %w", err)
+	}
+	if err := os.Chmod(exportDir, 0700); err != nil {
+		return "", fmt.Errorf("failed to set export directory permissions: %w", err)
+	}
+	fileBase := safePeerFilename(peerName)
+	fileName := fmt.Sprintf("%s.conf", fileBase)
+	exportPath := filepath.Join(exportDir, fileName)
+	if _, err := os.Stat(exportPath); err == nil {
+		exportPath = filepath.Join(exportDir, fmt.Sprintf("%s-%d.conf", fileBase, time.Now().Unix()))
+	}
+	if err := clientConfigFileWriter(exportPath, []byte(clientConfig), 0600); err != nil {
+		return "", fmt.Errorf("failed to write client config: %w", err)
+	}
+	return exportPath, nil
 }
 
 func buildServerPeerBlock(name, publicKey, presharedKey, allowedIP string, keepalive int) string {
