@@ -49,17 +49,17 @@ func sanitizePeerName(name string) string {
 	name = strings.ReplaceAll(name, "\n", "")
 	name = strings.ReplaceAll(name, "\r", "")
 	name = strings.ReplaceAll(name, "\t", " ")
-	
+
 	// Remove brackets that could be used to inject sections
 	name = strings.ReplaceAll(name, "[", "")
 	name = strings.ReplaceAll(name, "]", "")
-	
+
 	// Remove hash/pound sign to prevent comment injection
 	name = strings.ReplaceAll(name, "#", "")
-	
+
 	// Trim whitespace
 	name = strings.TrimSpace(name)
-	
+
 	return name
 }
 
@@ -361,8 +361,10 @@ func (w *WireGuardSetup) EnableService(interfaceName string) error {
 //   - Prompts for peer name, public key, allowed IPs, and endpoint.
 //   - Returns an error if any prompt fails (e.g., EOF, user abort).
 //   - Returns an error if the public key is empty.
+//
 // Note:
 //   - Peer name sanitization is performed in the caller (AddPeerToConfig).
+//
 // Return value:
 //   - Returns a WireGuardPeer and nil error on success.
 //   - Returns nil and an error for non-recoverable input errors (such as EOF).
@@ -497,7 +499,7 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 		// Start with the interface IP and increment to get the first peer IP
 		// Convert /24 (or other CIDR) to /32 for peer
 		parts := strings.Split(interfaceIP, "/")
-		if len(parts) > 0 {
+		if len(parts) >= 2 {
 			baseIP := parts[0] + "/32"
 			// Increment from server IP (e.g., 10.253.0.1/32 → 10.253.0.2/32)
 			if incremented, err := incrementIP(baseIP); err == nil {
