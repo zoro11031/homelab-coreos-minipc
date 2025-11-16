@@ -37,6 +37,12 @@ var wireguardAddPeerCmd = &cobra.Command{
 			return fmt.Errorf("failed to initialize setup context: %w", err)
 		}
 
+		var keepalivePtr *int
+		if flag := cmd.Flags().Lookup("keepalive"); flag != nil && flag.Changed {
+			value := addPeerKeepalive
+			keepalivePtr = &value
+		}
+
 		opts := &steps.WireGuardPeerWorkflowOptions{
 			InterfaceName:              addPeerInterface,
 			PeerName:                   addPeerName,
@@ -44,12 +50,11 @@ var wireguardAddPeerCmd = &cobra.Command{
 			DNS:                        addPeerDNS,
 			ClientAllowedIPs:           addPeerAllowedIPs,
 			OutputDir:                  addPeerOutputDir,
-			PersistentKeepaliveSeconds: addPeerKeepalive,
+			PersistentKeepaliveSeconds: keepalivePtr,
 			ProvidedPresharedKey:       addPeerPresharedKey,
 			NonInteractive:             addPeerNonInteractive,
 			SkipQRCode:                 addPeerSkipQR,
 		}
-
 
 		if flag := cmd.Flags().Lookup("route-all"); flag != nil && flag.Changed {
 			opts.RouteAll = &addPeerRouteAll
@@ -75,7 +80,7 @@ func init() {
 	wireguardAddPeerCmd.Flags().StringVar(&addPeerAllowedIPs, "client-allowed-ips", "", "Override client AllowedIPs")
 	wireguardAddPeerCmd.Flags().BoolVar(&addPeerRouteAll, "route-all", true, "Route all client traffic through the VPN")
 	wireguardAddPeerCmd.Flags().StringVar(&addPeerOutputDir, "export-dir", "", "Directory for exported peer configs")
-	wireguardAddPeerCmd.Flags().IntVar(&addPeerKeepalive, "keepalive", 25, "PersistentKeepalive in seconds")
+	wireguardAddPeerCmd.Flags().IntVar(&addPeerKeepalive, "keepalive", 25, "PersistentKeepalive in seconds (use 0 to disable)")
 	wireguardAddPeerCmd.Flags().BoolVar(&addPeerNoPSK, "no-psk", false, "Skip preshared key generation")
 	wireguardAddPeerCmd.Flags().StringVar(&addPeerPresharedKey, "preshared-key", "", "Provide an explicit preshared key")
 	wireguardAddPeerCmd.Flags().BoolVar(&addPeerNonInteractive, "non-interactive", false, "Run without prompts (requires values)")
