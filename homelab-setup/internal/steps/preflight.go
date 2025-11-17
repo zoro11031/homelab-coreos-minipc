@@ -10,16 +10,14 @@ import (
 
 // PreflightChecker performs system validation checks before setup begins
 type PreflightChecker struct {
-	network *system.Network
 	ui      *ui.UI
 	markers *config.Markers
 	config  *config.Config
 }
 
 // NewPreflightChecker creates a new PreflightChecker instance
-func NewPreflightChecker(network *system.Network, ui *ui.UI, markers *config.Markers, cfg *config.Config) *PreflightChecker {
+func NewPreflightChecker(ui *ui.UI, markers *config.Markers, cfg *config.Config) *PreflightChecker {
 	return &PreflightChecker{
-		network: network,
 		ui:      ui,
 		markers: markers,
 		config:  cfg,
@@ -202,7 +200,7 @@ func (p *PreflightChecker) CheckNetworkConnectivity() error {
 	p.ui.Info("Checking network connectivity...")
 
 	// Test connectivity to a reliable host
-	reachable, err := p.network.TestConnectivity("8.8.8.8", 3)
+	reachable, err := system.TestConnectivity("8.8.8.8", 3)
 	if err != nil {
 		return fmt.Errorf("failed to test connectivity: %w", err)
 	}
@@ -219,14 +217,14 @@ func (p *PreflightChecker) CheckNetworkConnectivity() error {
 	p.ui.Success("Internet connectivity confirmed")
 
 	// Get and display default gateway
-	gateway, err := p.network.GetDefaultGateway()
+	gateway, err := system.GetDefaultGateway()
 	if err != nil {
 		p.ui.Warning(fmt.Sprintf("Could not determine default gateway: %v", err))
 	} else {
 		p.ui.Infof("Default gateway: %s", gateway)
 
 		// Test gateway connectivity
-		gwReachable, _ := p.network.TestConnectivity(gateway, 2)
+		gwReachable, _ := system.TestConnectivity(gateway, 2)
 		if gwReachable {
 			p.ui.Success("Default gateway is reachable")
 		} else {
@@ -247,7 +245,7 @@ func (p *PreflightChecker) CheckNFSServer(host string) error {
 	p.ui.Infof("Checking NFS server: %s", host)
 
 	// First check basic connectivity
-	reachable, err := p.network.TestConnectivity(host, 5)
+	reachable, err := system.TestConnectivity(host, 5)
 	if err != nil {
 		return fmt.Errorf("failed to test NFS server connectivity: %w", err)
 	}
@@ -264,7 +262,7 @@ func (p *PreflightChecker) CheckNFSServer(host string) error {
 	p.ui.Success(fmt.Sprintf("NFS server %s is reachable", host))
 
 	// Check if NFS exports are available
-	hasExports, err := p.network.CheckNFSServer(host)
+	hasExports, err := system.CheckNFSServer(host)
 	if err != nil {
 		return fmt.Errorf("failed to check NFS exports: %w", err)
 	}
@@ -281,7 +279,7 @@ func (p *PreflightChecker) CheckNFSServer(host string) error {
 	p.ui.Success("NFS server has accessible exports")
 
 	// Try to get and display exports
-	exports, err := p.network.GetNFSExports(host)
+	exports, err := system.GetNFSExports(host)
 	if err == nil && exports != "" {
 		p.ui.Info("Available NFS exports:")
 		p.ui.Print(exports)

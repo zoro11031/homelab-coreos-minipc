@@ -33,7 +33,6 @@ type WireGuardPeer struct {
 
 // WireGuardSetup handles WireGuard VPN setup
 type WireGuardSetup struct {
-	network *system.Network
 	config  *config.Config
 	ui      *ui.UI
 	markers *config.Markers
@@ -149,9 +148,8 @@ func sanitizeConfigValue(value string) string {
 }
 
 // NewWireGuardSetup creates a new WireGuardSetup instance
-func NewWireGuardSetup(network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers) *WireGuardSetup {
+func NewWireGuardSetup(cfg *config.Config, ui *ui.UI, markers *config.Markers) *WireGuardSetup {
 	return &WireGuardSetup{
-		network: network,
 		config:  cfg,
 		ui:      ui,
 		markers: markers,

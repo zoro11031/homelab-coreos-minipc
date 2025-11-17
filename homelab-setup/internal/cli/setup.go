@@ -5,7 +5,6 @@ import (
 
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/steps"
-	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/system"
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/ui"
 )
 
@@ -39,15 +38,11 @@ func NewSetupContextWithOptions(nonInteractive bool, skipWireGuard bool) (*Setup
 	uiInstance := ui.New()
 	uiInstance.SetNonInteractive(nonInteractive)
 
-	// Initialize system components
-	network := system.NewNetwork()
-
 	// Initialize step manager
 	stepMgr := NewStepManager(
 		cfg,
 		markers,
 		uiInstance,
-		network,
 	)
 
 	return &SetupContext{
@@ -64,7 +59,6 @@ type StepManager struct {
 	config  *config.Config
 	markers *config.Markers
 	ui      *ui.UI
-	network *system.Network
 
 	// Step instances
 	preflight  *steps.PreflightChecker
@@ -81,18 +75,16 @@ func NewStepManager(
 	cfg *config.Config,
 	markers *config.Markers,
 	uiInstance *ui.UI,
-	network *system.Network,
 ) *StepManager {
 	return &StepManager{
 		config:     cfg,
 		markers:    markers,
 		ui:         uiInstance,
-		network:    network,
-		preflight:  steps.NewPreflightChecker(network, uiInstance, markers, cfg),
+		preflight:  steps.NewPreflightChecker(uiInstance, markers, cfg),
 		user:       steps.NewUserConfigurator(cfg, uiInstance, markers),
 		directory:  steps.NewDirectorySetup(cfg, uiInstance, markers),
-		wireguard:  steps.NewWireGuardSetup(network, cfg, uiInstance, markers),
-		nfs:        steps.NewNFSConfigurator(network, cfg, uiInstance, markers),
+		wireguard:  steps.NewWireGuardSetup(cfg, uiInstance, markers),
+		nfs:        steps.NewNFSConfigurator(cfg, uiInstance, markers),
 		container:  steps.NewContainerSetup(cfg, uiInstance, markers),
 		deployment: steps.NewDeployment(cfg, uiInstance, markers),
 	}

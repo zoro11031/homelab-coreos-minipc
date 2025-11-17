@@ -8,16 +8,8 @@ import (
 	"time"
 )
 
-// Network handles network operations
-type Network struct{}
-
-// NewNetwork creates a new Network instance
-func NewNetwork() *Network {
-	return &Network{}
-}
-
 // TestConnectivity tests connectivity to a host using ping
-func (n *Network) TestConnectivity(host string, timeoutSeconds int) (bool, error) {
+func TestConnectivity(host string, timeoutSeconds int) (bool, error) {
 	// Use ping with specified timeout
 	cmd := exec.Command("ping", "-c", "1", "-W", fmt.Sprintf("%d", timeoutSeconds), host)
 	err := cmd.Run()
@@ -37,7 +29,7 @@ func (n *Network) TestConnectivity(host string, timeoutSeconds int) (bool, error
 }
 
 // GetDefaultInterface returns the default network interface
-func (n *Network) GetDefaultInterface() (string, error) {
+func GetDefaultInterface() (string, error) {
 	cmd := exec.Command("ip", "route")
 	output, err := cmd.Output()
 	if err != nil {
@@ -61,7 +53,7 @@ func (n *Network) GetDefaultInterface() (string, error) {
 }
 
 // GetInterfaceIP returns the IP address of a network interface
-func (n *Network) GetInterfaceIP(interfaceName string) (string, error) {
+func GetInterfaceIP(interfaceName string) (string, error) {
 	iface, err := net.InterfaceByName(interfaceName)
 	if err != nil {
 		return "", fmt.Errorf("failed to get interface %s: %w", interfaceName, err)
@@ -84,7 +76,7 @@ func (n *Network) GetInterfaceIP(interfaceName string) (string, error) {
 }
 
 // GetDefaultGateway returns the default gateway IP address
-func (n *Network) GetDefaultGateway() (string, error) {
+func GetDefaultGateway() (string, error) {
 	cmd := exec.Command("ip", "route")
 	output, err := cmd.Output()
 	if err != nil {
@@ -108,7 +100,7 @@ func (n *Network) GetDefaultGateway() (string, error) {
 }
 
 // GetHostname returns the system hostname
-func (n *Network) GetHostname() (string, error) {
+func GetHostname() (string, error) {
 	cmd := exec.Command("hostname")
 	output, err := cmd.Output()
 	if err != nil {
@@ -119,7 +111,7 @@ func (n *Network) GetHostname() (string, error) {
 }
 
 // GetAllInterfaces returns a list of all network interfaces
-func (n *Network) GetAllInterfaces() ([]string, error) {
+func GetAllInterfaces() ([]string, error) {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get interfaces: %w", err)
@@ -134,7 +126,7 @@ func (n *Network) GetAllInterfaces() ([]string, error) {
 }
 
 // IsPortOpen checks if a TCP port is open on a host
-func (n *Network) IsPortOpen(host string, port int, timeoutSeconds int) (bool, error) {
+func IsPortOpen(host string, port int, timeoutSeconds int) (bool, error) {
 	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	timeout := time.Duration(timeoutSeconds) * time.Second
 
@@ -153,7 +145,7 @@ func (n *Network) IsPortOpen(host string, port int, timeoutSeconds int) (bool, e
 }
 
 // ResolveDNS resolves a hostname to IP addresses
-func (n *Network) ResolveDNS(hostname string) ([]string, error) {
+func ResolveDNS(hostname string) ([]string, error) {
 	addrs, err := net.LookupHost(hostname)
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve %s: %w", hostname, err)
@@ -163,7 +155,7 @@ func (n *Network) ResolveDNS(hostname string) ([]string, error) {
 }
 
 // TestTCPConnection tests if a TCP connection can be established
-func (n *Network) TestTCPConnection(host string, port int) (bool, error) {
+func TestTCPConnection(host string, port int) (bool, error) {
 	address := net.JoinHostPort(host, fmt.Sprintf("%d", port))
 	conn, err := net.DialTimeout("tcp", address, 5*time.Second)
 	if err != nil {
@@ -174,7 +166,7 @@ func (n *Network) TestTCPConnection(host string, port int) (bool, error) {
 }
 
 // GetLocalIP returns the local non-loopback IP address
-func (n *Network) GetLocalIP() (string, error) {
+func GetLocalIP() (string, error) {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return "", fmt.Errorf("failed to get interface addresses: %w", err)
@@ -192,9 +184,9 @@ func (n *Network) GetLocalIP() (string, error) {
 }
 
 // CheckNFSServer checks if an NFS server is reachable and has exports
-func (n *Network) CheckNFSServer(serverIP string) (bool, error) {
+func CheckNFSServer(serverIP string) (bool, error) {
 	// First check if server is reachable
-	reachable, err := n.TestConnectivity(serverIP, 5)
+	reachable, err := TestConnectivity(serverIP, 5)
 	if err != nil {
 		return false, err
 	}
@@ -215,7 +207,7 @@ func (n *Network) CheckNFSServer(serverIP string) (bool, error) {
 }
 
 // GetNFSExports returns the list of NFS exports from a server
-func (n *Network) GetNFSExports(serverIP string) (string, error) {
+func GetNFSExports(serverIP string) (string, error) {
 	cmd := exec.Command("showmount", "-e", serverIP)
 	output, err := cmd.Output()
 	if err != nil {

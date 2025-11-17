@@ -14,7 +14,6 @@ import (
 
 // NFSConfigurator handles NFS mount configuration
 type NFSConfigurator struct {
-	network *system.Network
 	config  *config.Config
 	ui      *ui.UI
 	markers *config.Markers
@@ -22,9 +21,8 @@ type NFSConfigurator struct {
 }
 
 // NewNFSConfigurator creates a new NFSConfigurator instance
-func NewNFSConfigurator(network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers) *NFSConfigurator {
+func NewNFSConfigurator(cfg *config.Config, ui *ui.UI, markers *config.Markers) *NFSConfigurator {
 	return &NFSConfigurator{
-		network: network,
 		config:  cfg,
 		ui:      ui,
 		markers: markers,
@@ -149,7 +147,7 @@ func (n *NFSConfigurator) ValidateNFSConnection(host string) error {
 	}
 
 	// Test basic connectivity with configurable timeout
-	reachable, err := n.network.TestConnectivity(host, timeout)
+	reachable, err := system.TestConnectivity(host, timeout)
 	if err != nil {
 		return fmt.Errorf("failed to test connectivity: %w", err)
 	}
@@ -166,7 +164,7 @@ func (n *NFSConfigurator) ValidateNFSConnection(host string) error {
 	n.ui.Success("NFS server is reachable")
 
 	// Check if NFS exports are available
-	hasExports, err := n.network.CheckNFSServer(host)
+	hasExports, err := system.CheckNFSServer(host)
 	if err != nil {
 		return fmt.Errorf("failed to check NFS exports: %w", err)
 	}
@@ -190,7 +188,7 @@ func (n *NFSConfigurator) ValidateNFSConnection(host string) error {
 		n.ui.Success("NFS server has accessible exports")
 
 		// Try to display exports
-		exports, err := n.network.GetNFSExports(host)
+		exports, err := system.GetNFSExports(host)
 		if err == nil && exports != "" {
 			n.ui.Print("")
 			n.ui.Info("Available NFS exports:")
@@ -211,7 +209,7 @@ func (n *NFSConfigurator) ValidateNFSExport(host, export string) error {
 	n.ui.Infof("Verifying export path '%s' on server...", export)
 
 	// Get the list of exports from the server
-	exports, err := n.network.GetNFSExports(host)
+	exports, err := system.GetNFSExports(host)
 	if err != nil {
 		n.ui.Warning(fmt.Sprintf("Could not verify export path: %v", err))
 		n.ui.Info("Proceeding without verification - mount will fail if export doesn't exist")
