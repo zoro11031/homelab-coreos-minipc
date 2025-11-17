@@ -1,4 +1,4 @@
-.PHONY: build install test test-verbose test-coverage lint clean run help
+.PHONY: build install lint clean run help
 
 # Build variables
 BINARY_NAME=homelab-setup
@@ -29,37 +29,19 @@ install:
 	go install $(LDFLAGS) $(MAIN_PATH)
 	@echo "Installed to: $(shell go env GOPATH)/bin/$(BINARY_NAME)"
 
-## test: Run tests
-test:
-	@echo "Running tests..."
-	go test ./...
-
-## test-verbose: Run tests with verbose output and coverage
-test-verbose:
-	@echo "Running tests (verbose with coverage)..."
-	go test -v -cover ./...
-
-## test-coverage: Run tests with coverage report
-test-coverage:
-	@echo "Running tests with coverage..."
-	go test -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report generated: coverage.html"
-
 ## lint: Run linter (requires golangci-lint)
 lint:
 	@echo "Running linter..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-		golangci-lint run; \
+	golangci-lint run; \
 	else \
-		echo "golangci-lint not installed. Install from: https://golangci-lint.run/usage/install/"; \
+	echo "golangci-lint not installed. Install from: https://golangci-lint.run/usage/install/"; \
 	fi
 
 ## clean: Clean build artifacts
 clean:
 	@echo "Cleaning..."
 	rm -rf $(BUILD_DIR)
-	rm -f coverage.out coverage.html
 	go clean
 
 ## run: Build and run the binary
