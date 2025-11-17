@@ -32,9 +32,7 @@ func TestAddToFstabAppendsEntryAndReloads(t *testing.T) {
 	testUI := ui.NewWithWriter(buf)
 
 	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers)
-	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{
-		"systemd-escape --path --suffix=mount /mnt/nas-media": "mnt-nas\\x2dmedia.mount\n",
-	}}
+	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{}}
 	nfs.runner = fakeRunner
 
 	if err := nfs.AddToFstab("192.168.1.10", "/export", "/mnt/data"); err != nil {
