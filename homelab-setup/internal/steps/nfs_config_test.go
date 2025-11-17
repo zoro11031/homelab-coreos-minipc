@@ -203,3 +203,134 @@ func TestPathToUnitName(t *testing.T) {
 		}
 	}
 }
+
+func TestGetNFSMountOptions(t *testing.T) {
+	tests := []struct {
+		name           string
+		configValue    string
+		expectedResult string
+		description    string
+	}{
+		{
+			name:           "default_when_empty",
+			configValue:    "",
+			expectedResult: "defaults,_netdev",
+			description:    "Should return default value when config is empty",
+		},
+		{
+			name:           "custom_value",
+			configValue:    "rw,soft,intr,timeo=30",
+			expectedResult: "rw,soft,intr,timeo=30",
+			description:    "Should return custom config value when set",
+		},
+		{
+			name:           "simple_custom",
+			configValue:    "defaults",
+			expectedResult: "defaults",
+			description:    "Should return simple custom value",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			cfg := config.New(filepath.Join(tmpDir, "config.conf"))
+
+			// Set config value if not empty
+			if tt.configValue != "" {
+				if err := cfg.Set("NFS_MOUNT_OPTIONS", tt.configValue); err != nil {
+					t.Fatalf("failed to set NFS_MOUNT_OPTIONS: %v", err)
+				}
+			}
+
+			fs := system.NewFileSystem()
+			network := system.NewNetwork()
+			packages := system.NewPackageManager()
+			markers := config.NewMarkers(tmpDir)
+			buf := &bytes.Buffer{}
+			testUI := ui.NewWithWriter(buf)
+
+			nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, packages)
+
+			result := nfs.getNFSMountOptions()
+
+			if result != tt.expectedResult {
+				t.Errorf("getNFSMountOptions() = %q, want %q (%s)", result, tt.expectedResult, tt.description)
+			}
+		})
+	}
+}
+
+func TestGetNFSMountOptionsConsistency(t *testing.T) {
+	// This test ensures the behavior of getNFSMountOptions is consistent
+	// with how it's used in CreateSystemdMountUnit and AddToFstab
+
+	tests := []struct {
+		name        string
+		configValue string
+	}{
+		{
+			name:        "with_default",
+			configValue: "",
+		},
+		{
+			name:        "with_custom",
+			configValue: "rw,soft,intr",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmpDir := t.TempDir()
+			cfg := config.New(filepath.Join(tmpDir, "config.conf"))
+
+			if tt.configValue != "" {
+				if err := cfg.Set("NFS_MOUNT_OPTIONS", tt.configValue); err != nil {
+					t.Fatalf("failed to set NFS_MOUNT_OPTIONS: %v", err)
+				}
+			}
+
+			// Set up fstab path for AddToFstab test
+			fstabPath := filepath.Join(tmpDir, "fstab")
+			if err := os.WriteFile(fstabPath, []byte("# test fstab\n"), 0644); err != nil {
+				t.Fatalf("failed to seed fstab: %v", err)
+			}
+			if err := cfg.Set("NFS_FSTAB_PATH", fstabPath); err != nil {
+				t.Fatalf("failed to set fstab path: %v", err)
+			}
+
+			fs := system.NewFileSystem()
+			network := system.NewNetwork()
+			packages := system.NewPackageManager()
+			markers := config.NewMarkers(tmpDir)
+			buf := &bytes.Buffer{}
+			testUI := ui.NewWithWriter(buf)
+
+			nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, packages)
+			fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{}}
+			nfs.runner = fakeRunner
+
+			// Get the expected mount options
+			expectedOptions := nfs.getNFSMountOptions()
+			if expectedOptions == "" {
+				expectedOptions = "defaults,_netdev"
+			}
+
+			// Test AddToFstab uses the same options
+			if err := nfs.AddToFstab("192.168.1.10", "/export", "/mnt/data"); err != nil {
+				t.Fatalf("AddToFstab failed: %v", err)
+			}
+
+			data, err := os.ReadFile(fstabPath)
+			if err != nil {
+				t.Fatalf("failed to read fstab: %v", err)
+			}
+
+			expectedLine := fmt.Sprintf("192.168.1.10:/export /mnt/data nfs %s 0 0", expectedOptions)
+			if !strings.Contains(string(data), expectedLine) {
+				t.Errorf("fstab missing expected entry with mount options %q.\nExpected: %s\nGot: %s",
+					expectedOptions, expectedLine, string(data))
+			}
+		})
+	}
+}
