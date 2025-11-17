@@ -15,7 +15,6 @@ const (
 	KeyNFSServer       = "NFS_SERVER"
 	KeyNFSExport       = "NFS_EXPORT"
 	KeyNFSMountPoint   = "NFS_MOUNT_POINT"
-	KeyNFSFstabPath    = "NFS_FSTAB_PATH"
 	KeyNFSMountOptions = "NFS_MOUNT_OPTIONS"
 
 	// WireGuard configuration
@@ -42,7 +41,6 @@ var Defaults = map[string]string{
 	KeyContainersBase:     "/srv/containers",
 	KeyContainerRuntime:   "podman",
 	KeyNFSMountPoint:      "/mnt/nas",
-	KeyNFSFstabPath:       "/etc/fstab",
 	KeyNetworkTestRetries: "5",
 	KeyNetworkTestTimeout: "10",
 	KeyConfigVersion:      "1",

@@ -2,7 +2,6 @@ package steps
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -20,7 +19,7 @@ type PackageChecker interface {
 
 // NFSConfigurator handles NFS mount configuration
 type NFSConfigurator struct {
-	fs       *system.FileSystem
+	fs       system.FileSystemManager
 	network  *system.Network
 	config   *config.Config
 	ui       *ui.UI
@@ -30,7 +29,7 @@ type NFSConfigurator struct {
 }
 
 // NewNFSConfigurator creates a new NFSConfigurator instance
-func NewNFSConfigurator(fs *system.FileSystem, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers, packages PackageChecker) *NFSConfigurator {
+func NewNFSConfigurator(fs system.FileSystemManager, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers, packages PackageChecker) *NFSConfigurator {
 	return &NFSConfigurator{
 		fs:       fs,
 		network:  network,
@@ -40,14 +39,6 @@ func NewNFSConfigurator(fs *system.FileSystem, network *system.Network, cfg *con
 		runner:   system.NewCommandRunner(),
 		packages: packages,
 	}
-}
-
-func (n *NFSConfigurator) getFstabPath() string {
-	path := n.config.GetOrDefault(config.KeyNFSFstabPath, "/etc/fstab")
-	if path == "" {
-		return "/etc/fstab"
-	}
-	return path
 }
 
 // CheckNFSUtils verifies that nfs-utils package is installed
@@ -326,27 +317,35 @@ func (n *NFSConfigurator) getNFSMountOptions() string {
 	return options
 }
 
-// CreateSystemdMountUnit creates a systemd mount unit for NFS
-func (n *NFSConfigurator) CreateSystemdMountUnit(host, export, mountPoint string) error {
-	n.ui.Info("Creating systemd mount unit...")
+// CreateSystemdUnits creates a systemd mount and automount unit for NFS.
+func (n *NFSConfigurator) CreateSystemdUnits(host, export, mountPoint string) error {
+	n.ui.Info("Creating systemd mount and automount units...")
 
-	// Convert mount point to systemd unit name using simple string replacement
-	// Example: /mnt/nas-media -> mnt-nas-media.mount
-	unitName := mountPointToUnitName(mountPoint)
-	unitPath := filepath.Join("/etc/systemd/system", unitName)
+	// Convert mount point to systemd unit name.
+	// Example: /mnt/nas-media -> mnt-nas-media
+	unitBaseName := mountPointToUnitName(mountPoint)
+	unitBaseName = strings.TrimSuffix(unitBaseName, ".mount")
 
-	n.ui.Infof("Creating mount unit: %s", unitName)
+	mountUnitName := unitBaseName + ".mount"
+	automountUnitName := unitBaseName + ".automount"
 
-	// Get NFS mount options from config or use default
+	mountUnitPath := filepath.Join("/etc/systemd/system", mountUnitName)
+	automountUnitPath := filepath.Join("/etc/systemd/system", automountUnitName)
+
+	n.ui.Infof("Creating units: %s, %s", mountUnitName, automountUnitName)
+
+	// Get NFS mount options from config or use default, add nofail for resilience.
 	mountOptions := n.getNFSMountOptions()
+	if !strings.Contains(mountOptions, "nofail") {
+		mountOptions = "nofail," + mountOptions
+	}
 	n.ui.Infof("Using NFS mount options: %s", mountOptions)
 
-	// Generate mount unit content
-	content := fmt.Sprintf(`[Unit]
+	// Generate mount unit content.
+	mountContent := fmt.Sprintf(`[Unit]
 Description=NFS mount for %s
 After=network-online.target
 Requires=network-online.target
-Wants=network-online.target
 
 [Mount]
 What=%s:%s
@@ -354,121 +353,47 @@ Where=%s
 Type=nfs
 Options=%s
 TimeoutSec=30
+`, mountPoint, host, export, mountPoint, mountOptions)
+
+	// Generate automount unit content.
+	automountContent := fmt.Sprintf(`[Unit]
+Description=Automount for %s
+After=network-online.target
+Requires=network-online.target
+
+[Automount]
+Where=%s
+TimeoutIdleSec=600
 
 [Install]
 WantedBy=multi-user.target
-`, mountPoint, host, export, mountPoint, mountOptions)
+`, mountPoint, mountPoint)
 
-	// Check if unit already exists
-	existingContent, err := os.ReadFile(unitPath)
-	if err == nil {
-		// Unit exists, check if content is the same
-		if string(existingContent) == content {
-			n.ui.Info("Mount unit already exists with correct configuration")
-			return nil
-		}
-		n.ui.Info("Updating existing mount unit")
+	// Write the mount unit file.
+	if err := n.fs.WriteFile(mountUnitPath, []byte(mountContent), 0644); err != nil {
+		return fmt.Errorf("failed to write mount unit %s: %w", mountUnitPath, err)
 	}
+	n.ui.Successf("Created mount unit: %s", mountUnitPath)
 
-	// Write the mount unit file
-	if err := n.fs.WriteFile(unitPath, []byte(content), 0644); err != nil {
-		return fmt.Errorf("failed to write mount unit %s: %w", unitPath, err)
+	// Write the automount unit file.
+	if err := n.fs.WriteFile(automountUnitPath, []byte(automountContent), 0644); err != nil {
+		return fmt.Errorf("failed to write automount unit %s: %w", automountUnitPath, err)
 	}
+	n.ui.Successf("Created automount unit: %s", automountUnitPath)
 
-	n.ui.Success(fmt.Sprintf("Created mount unit: %s", unitPath))
-
-	// Reload systemd to recognize the new unit
+	// Reload systemd to recognize the new units.
 	if output, err := n.runner.Run("sudo", "-n", "systemctl", "daemon-reload"); err != nil {
 		return fmt.Errorf("failed to reload systemd: %w\nOutput: %s", err, output)
 	}
-
 	n.ui.Success("systemd reloaded")
 
-	// Enable the mount unit
-	if output, err := n.runner.Run("sudo", "-n", "systemctl", "enable", unitName); err != nil {
-		return fmt.Errorf("failed to enable mount unit: %w\nOutput: %s", err, output)
+	// Enable and start the automount unit.
+	if output, err := n.runner.Run("sudo", "-n", "systemctl", "enable", "--now", automountUnitName); err != nil {
+		return fmt.Errorf("failed to enable and start automount unit: %w\nOutput: %s", err, output)
 	}
 
-	n.ui.Success(fmt.Sprintf("Enabled mount unit: %s", unitName))
+	n.ui.Successf("Enabled and started automount unit: %s", automountUnitName)
 
-	return nil
-}
-
-// AddToFstab adds NFS mount to /etc/fstab (deprecated, kept for compatibility)
-func (n *NFSConfigurator) AddToFstab(host, export, mountPoint string) error {
-	n.ui.Info("Adding NFS mount to /etc/fstab...")
-
-	// Get NFS mount options (same as systemd unit)
-	mountOptions := n.getNFSMountOptions()
-
-	entry := fmt.Sprintf("%s:%s %s nfs %s 0 0", host, export, mountPoint, mountOptions)
-	n.ui.Info("Fstab entry:")
-	n.ui.Printf("  %s", entry)
-	n.ui.Print("")
-	fstabPath := n.getFstabPath()
-
-	existing, err := os.ReadFile(fstabPath)
-	if err != nil {
-		if !os.IsNotExist(err) {
-			return fmt.Errorf("failed to read %s: %w", fstabPath, err)
-		}
-		// If the file doesn't exist, ensure the directory exists
-		dir := filepath.Dir(fstabPath)
-		if err := os.MkdirAll(dir, 0755); err != nil {
-			return fmt.Errorf("failed to create directory for %s: %w", fstabPath, err)
-		}
-	}
-
-	entryExists := false
-	if len(existing) > 0 {
-		for _, line := range strings.Split(string(existing), "\n") {
-			if strings.TrimSpace(line) == entry {
-				entryExists = true
-				break
-			}
-		}
-	}
-
-	if entryExists {
-		n.ui.Info("Fstab entry already exists; skipping append")
-	} else {
-		var builder strings.Builder
-		if len(existing) > 0 {
-			builder.Write(existing)
-			if !strings.HasSuffix(string(existing), "\n") {
-				builder.WriteString("\n")
-			}
-		}
-		builder.WriteString(entry)
-		builder.WriteString("\n")
-
-		if err := n.fs.WriteFile(fstabPath, []byte(builder.String()), 0644); err != nil {
-			return fmt.Errorf("failed to update %s: %w", fstabPath, err)
-		}
-		successMessage := "fstab entry"
-		if fstabPath != "/etc/fstab" {
-			successMessage = fmt.Sprintf("fstab entry in %s", fstabPath)
-		}
-		n.ui.Success(fmt.Sprintf("Created %s", successMessage))
-	}
-
-	if output, err := n.runner.Run("sudo", "-n", "systemctl", "daemon-reload"); err != nil {
-		return fmt.Errorf("failed to reload systemd after fstab update: %w\nOutput: %s", err, output)
-	}
-
-	n.ui.Success("systemd reloaded to pick up new mount units")
-	return nil
-}
-
-// MountNFS attempts to mount the NFS share
-func (n *NFSConfigurator) MountNFS(mountPoint string) error {
-	n.ui.Infof("Mounting NFS share at %s...", mountPoint)
-
-	if output, err := n.runner.Run("sudo", "-n", "mount", mountPoint); err != nil {
-		return fmt.Errorf("failed to mount %s: %w\nOutput: %s", mountPoint, err, output)
-	}
-
-	n.ui.Success("NFS share mounted successfully")
 	return nil
 }
 
@@ -546,44 +471,15 @@ func (n *NFSConfigurator) Run() error {
 		return fmt.Errorf("failed to create mount point: %w", err)
 	}
 
-	// Create systemd mount unit
-	n.ui.Step("Creating Systemd Mount Unit")
-	if err := n.CreateSystemdMountUnit(host, export, mountPoint); err != nil {
-		return fmt.Errorf("failed to create systemd mount unit: %w", err)
+	// Create systemd mount and automount units
+	n.ui.Step("Creating Systemd Units")
+	if err := n.CreateSystemdUnits(host, export, mountPoint); err != nil {
+		return fmt.Errorf("failed to create systemd units: %w", err)
 	}
 
-	// Keep /etc/fstab entry in sync for compatibility
-	n.ui.Step("Updating /etc/fstab")
-	if err := n.AddToFstab(host, export, mountPoint); err != nil {
-		return fmt.Errorf("failed to update /etc/fstab: %w", err)
-	}
-
-	// Start the mount unit
-	n.ui.Step("Starting Mount Unit")
-	unitName := mountPointToUnitName(mountPoint)
-	if output, err := n.runner.Run("sudo", "-n", "systemctl", "start", unitName); err != nil {
-		n.ui.Warning(fmt.Sprintf("Failed to start mount unit: %v", err))
-		n.ui.Info("Output: " + output)
-		n.ui.Print("")
-		n.ui.Info("The mount unit has been created and enabled, but failed to start.")
-		n.ui.Info("Common causes:")
-		n.ui.Info("  1. NFS server is not currently reachable")
-		n.ui.Info("  2. Network is not fully initialized")
-		n.ui.Info("  3. SELinux may be blocking the mount")
-		n.ui.Print("")
-		n.ui.Info("The mount will be attempted automatically:")
-		n.ui.Info("  - At next boot")
-		n.ui.Info("  - When accessing the mount point")
-		n.ui.Print("")
-		n.ui.Info("To diagnose the issue:")
-		n.ui.Infof("  sudo journalctl -u %s", unitName)
-		n.ui.Info("To manually start the mount:")
-		n.ui.Infof("  sudo systemctl start %s", unitName)
-		n.ui.Info("To check mount status:")
-		n.ui.Infof("  sudo systemctl status %s", unitName)
-	} else {
-		n.ui.Success("NFS share mounted successfully")
-	}
+	// The automount unit handles starting, so we don't need to manually start the mount unit.
+	// We also don't need to check the status here as it will be mounted on first access.
+	n.ui.Info("Systemd automount configured. The share will be mounted on first access.")
 
 	// Save configuration
 	n.ui.Step("Saving Configuration")

@@ -3,7 +3,6 @@ package steps
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -12,97 +11,6 @@ import (
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/system"
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/ui"
 )
-
-func TestAddToFstabAppendsEntryAndReloads(t *testing.T) {
-	tmpDir := t.TempDir()
-	fstabPath := filepath.Join(tmpDir, "fstab")
-	if err := os.WriteFile(fstabPath, []byte("# test fstab\n"), 0644); err != nil {
-		t.Fatalf("failed to seed fstab: %v", err)
-	}
-
-	cfg := config.New(filepath.Join(tmpDir, "config.conf"))
-	if err := cfg.Set("NFS_FSTAB_PATH", fstabPath); err != nil {
-		t.Fatalf("failed to set fstab path: %v", err)
-	}
-
-	fs := system.NewFileSystem()
-	network := system.NewNetwork()
-	packages := system.NewPackageManager()
-	markers := config.NewMarkers(tmpDir)
-	buf := &bytes.Buffer{}
-	testUI := ui.NewWithWriter(buf)
-
-	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, packages)
-	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{}}
-	nfs.runner = fakeRunner
-
-	if err := nfs.AddToFstab("192.168.1.10", "/export", "/mnt/data"); err != nil {
-		t.Fatalf("AddToFstab failed: %v", err)
-	}
-
-	data, err := os.ReadFile(fstabPath)
-	if err != nil {
-		t.Fatalf("failed to read fstab: %v", err)
-	}
-
-	// With the new configurable options, the default is "defaults,_netdev"
-	expectedLine := "192.168.1.10:/export /mnt/data nfs defaults,_netdev 0 0"
-	if !strings.Contains(string(data), expectedLine) {
-		t.Fatalf("fstab missing entry, content: %s", string(data))
-	}
-
-	if !fakeRunner.ran("sudo -n systemctl daemon-reload") {
-		t.Fatalf("expected systemctl daemon-reload to run, commands: %v", fakeRunner.commands)
-	}
-}
-
-func TestMountNFSUsesRunner(t *testing.T) {
-	tmpDir := t.TempDir()
-	cfg := config.New(filepath.Join(tmpDir, "config.conf"))
-	fs := system.NewFileSystem()
-	network := system.NewNetwork()
-	packages := system.NewPackageManager()
-	markers := config.NewMarkers(tmpDir)
-	buf := &bytes.Buffer{}
-	testUI := ui.NewWithWriter(buf)
-
-	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, packages)
-	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{}}
-	nfs.runner = fakeRunner
-
-	mountPoint := filepath.Join(tmpDir, "mnt")
-	if err := os.MkdirAll(mountPoint, 0755); err != nil {
-		t.Fatalf("failed to create mount point: %v", err)
-	}
-
-	if err := nfs.MountNFS(mountPoint); err != nil {
-		t.Fatalf("MountNFS failed: %v", err)
-	}
-
-	if !fakeRunner.ran(fmt.Sprintf("sudo -n mount %s", mountPoint)) {
-		t.Fatalf("expected mount command to run, commands: %v", fakeRunner.commands)
-	}
-}
-
-func TestMountNFSFailureReturnsError(t *testing.T) {
-	tmpDir := t.TempDir()
-	cfg := config.New(filepath.Join(tmpDir, "config.conf"))
-	fs := system.NewFileSystem()
-	network := system.NewNetwork()
-	packages := system.NewPackageManager()
-	markers := config.NewMarkers(tmpDir)
-	buf := &bytes.Buffer{}
-	testUI := ui.NewWithWriter(buf)
-
-	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, packages)
-	fakeRunner := &fakeCommandRunner{failCommand: "sudo -n mount /mnt/fail"}
-	nfs.runner = fakeRunner
-
-	mountPoint := "/mnt/fail"
-	if err := nfs.MountNFS(mountPoint); err == nil {
-		t.Fatal("expected MountNFS to fail when runner returns error")
-	}
-}
 
 type fakeCommandRunner struct {
 	commands       []string
@@ -170,41 +78,69 @@ func (f *fakePackageManager) GetPackageVersion(packageName string) (string, erro
 	return "", fmt.Errorf("package not installed")
 }
 
-func TestCreateSystemdMountUnit(t *testing.T) {
-	// This test verifies the systemd unit file generation logic
-	// The function tries to write to /etc/systemd/system which requires root
-	// In a test environment, we'll skip the actual execution but verify the logic
-
+func TestCreateSystemdUnits(t *testing.T) {
 	tmpDir := t.TempDir()
-
 	cfg := config.New(filepath.Join(tmpDir, "config.conf"))
-	fs := system.NewFileSystem()
+
+	// Use the mock filesystem to capture output
+	mockFS := system.NewMockFileSystem()
+
 	network := system.NewNetwork()
 	packages := system.NewPackageManager()
 	markers := config.NewMarkers(tmpDir)
 	buf := &bytes.Buffer{}
 	testUI := ui.NewWithWriter(buf)
 
-	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, packages)
+	nfs := NewNFSConfigurator(mockFS, network, cfg, testUI, markers, packages)
 	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{}}
 	nfs.runner = fakeRunner
 
-	// Test creating mount unit - this will fail due to permissions
-	// but we're mainly testing the logic flow
 	host := "192.168.1.10"
 	export := "/mnt/storage/media"
 	mountPoint := "/mnt/nas-media"
 
-	// The function will fail because we can't write to /etc/systemd/system
-	// but that's expected in a test environment
-	err := nfs.CreateSystemdMountUnit(host, export, mountPoint)
-	if err == nil {
-		t.Skip("Test skipped: requires root access to write systemd units")
+	err := nfs.CreateSystemdUnits(host, export, mountPoint)
+	if err != nil {
+		t.Fatalf("CreateSystemdUnits failed: %v", err)
 	}
 
-	// Verify error is about permissions
-	if !strings.Contains(err.Error(), "failed to write mount unit") {
-		t.Logf("Expected permission error, got: %v", err)
+	// 1. Verify .mount file content
+	mountUnitName := "mnt-nas-media.mount"
+	mountUnitPath := filepath.Join("/etc/systemd/system", mountUnitName)
+	mountContent, found := mockFS.WrittenFiles[mountUnitPath]
+	if !found {
+		t.Fatalf("expected mount unit file %s to be written, but it wasn't", mountUnitPath)
+	}
+	if !strings.Contains(string(mountContent), "What=192.168.1.10:/mnt/storage/media") {
+		t.Errorf(".mount file has wrong 'What=' line: %s", string(mountContent))
+	}
+	if !strings.Contains(string(mountContent), "Where=/mnt/nas-media") {
+		t.Errorf(".mount file has wrong 'Where=' line: %s", string(mountContent))
+	}
+	if !strings.Contains(string(mountContent), "Options=nofail,defaults,_netdev") {
+		t.Errorf(".mount file has wrong 'Options=' line: %s", string(mountContent))
+	}
+
+	// 2. Verify .automount file content
+	automountUnitName := "mnt-nas-media.automount"
+	automountUnitPath := filepath.Join("/etc/systemd/system", automountUnitName)
+	automountContent, found := mockFS.WrittenFiles[automountUnitPath]
+	if !found {
+		t.Fatalf("expected automount unit file %s to be written, but it wasn't", automountUnitPath)
+	}
+	if !strings.Contains(string(automountContent), "Where=/mnt/nas-media") {
+		t.Errorf(".automount file has wrong 'Where=' line: %s", string(automountContent))
+	}
+	if !strings.Contains(string(automountContent), "[Automount]") {
+		t.Errorf(".automount file is missing [Automount] section: %s", string(automountContent))
+	}
+
+	// 3. Verify systemd commands
+	if !fakeRunner.ran("sudo -n systemctl daemon-reload") {
+		t.Error("expected 'systemctl daemon-reload' to be run")
+	}
+	if !fakeRunner.ran("sudo -n systemctl enable --now mnt-nas-media.automount") {
+		t.Error("expected 'systemctl enable --now' for the automount unit to be run")
 	}
 }
 
