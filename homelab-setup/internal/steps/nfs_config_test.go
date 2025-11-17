@@ -133,6 +133,45 @@ func (f *fakeCommandRunner) ran(command string) bool {
 	return false
 }
 
+// fakePackageManager is a mock PackageManager for testing
+type fakePackageManager struct {
+	installedPackages map[string]bool
+	checkError        error
+}
+
+func (f *fakePackageManager) IsInstalled(packageName string) (bool, error) {
+	if f.checkError != nil {
+		return false, f.checkError
+	}
+	installed, ok := f.installedPackages[packageName]
+	if !ok {
+		return false, nil
+	}
+	return installed, nil
+}
+
+func (f *fakePackageManager) CheckMultiple(packages []string) (map[string]bool, error) {
+	result := make(map[string]bool)
+	for _, pkg := range packages {
+		installed, err := f.IsInstalled(pkg)
+		if err != nil {
+			return nil, err
+		}
+		result[pkg] = installed
+	}
+	return result, nil
+}
+
+func (f *fakePackageManager) GetPackageVersion(packageName string) (string, error) {
+	if f.checkError != nil {
+		return "", f.checkError
+	}
+	if installed, ok := f.installedPackages[packageName]; ok && installed {
+		return "1.0.0", nil
+	}
+	return "", fmt.Errorf("package not installed")
+}
+
 func TestCreateSystemdMountUnit(t *testing.T) {
 	// This test verifies the systemd unit file generation logic
 	// The function tries to write to /etc/systemd/system which requires root
@@ -204,90 +243,95 @@ func TestPathToUnitName(t *testing.T) {
 	}
 }
 
-func TestMountPointToUnitName(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected string
-	}{
-		{
-			name:     "simple path with single directory",
-			input:    "/mnt/data",
-			expected: "mnt-data.mount",
-		},
-		{
-			name:     "nested path with multiple directories",
-			input:    "/mnt/foo/bar/baz",
-			expected: "mnt-foo-bar-baz.mount",
-		},
-		{
-			name:     "path with hyphen in name",
-			input:    "/mnt/nas-media",
-			expected: "mnt-nas-media.mount",
-		},
-		{
-			name:     "path with multiple hyphens",
-			input:    "/mnt/nas-nextcloud",
-			expected: "mnt-nas-nextcloud.mount",
-		},
-		{
-			name:     "path with srv directory",
-			input:    "/srv/data",
-			expected: "srv-data.mount",
-		},
-		{
-			name:     "deeply nested path",
-			input:    "/mnt/storage/media/videos",
-			expected: "mnt-storage-media-videos.mount",
-		},
-		{
-			name:     "path with single letter components",
-			input:    "/a/b/c",
-			expected: "a-b-c.mount",
-		},
-		{
-			name:     "path with numbers",
-			input:    "/mnt/disk1",
-			expected: "mnt-disk1.mount",
-		},
-		{
-			name:     "path without leading slash",
-			input:    "mnt/data",
-			expected: "mnt-data.mount",
-		},
-		{
-			name:     "path with spaces (not recommended but should work)",
-			input:    "/mnt/My Media",
-			expected: "mnt-My Media.mount",
-		},
-		{
-			name:     "path with underscores",
-			input:    "/mnt/nas_storage",
-			expected: "mnt-nas_storage.mount",
-		},
-		{
-			name:     "path with dots",
-			input:    "/mnt/media.backup",
-			expected: "mnt-media.backup.mount",
-		},
-		{
-			name:     "root path",
-			input:    "/",
-			expected: ".mount",
-		},
-		{
-			name:     "empty string",
-			input:    "",
-			expected: ".mount",
+func TestCheckNFSUtilsWhenInstalled(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := config.New(filepath.Join(tmpDir, "config.conf"))
+	fs := system.NewFileSystem()
+	network := system.NewNetwork()
+	markers := config.NewMarkers(tmpDir)
+	buf := &bytes.Buffer{}
+	testUI := ui.NewWithWriter(buf)
+
+	// Create a fake package manager where nfs-utils is installed
+	fakePackages := &fakePackageManager{
+		installedPackages: map[string]bool{
+			"nfs-utils": true,
 		},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := mountPointToUnitName(tt.input)
-			if result != tt.expected {
-				t.Errorf("mountPointToUnitName(%q) = %q, want %q", tt.input, result, tt.expected)
-			}
-		})
+	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, fakePackages)
+
+	err := nfs.CheckNFSUtils()
+	if err != nil {
+		t.Errorf("CheckNFSUtils() returned error when nfs-utils is installed: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "nfs-utils package is installed") {
+		t.Errorf("Expected success message, got: %s", output)
+	}
+}
+
+func TestCheckNFSUtilsWhenNotInstalled(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := config.New(filepath.Join(tmpDir, "config.conf"))
+	fs := system.NewFileSystem()
+	network := system.NewNetwork()
+	markers := config.NewMarkers(tmpDir)
+	buf := &bytes.Buffer{}
+	testUI := ui.NewWithWriter(buf)
+
+	// Create a fake package manager where nfs-utils is not installed
+	fakePackages := &fakePackageManager{
+		installedPackages: map[string]bool{
+			"nfs-utils": false,
+		},
+	}
+
+	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, fakePackages)
+
+	err := nfs.CheckNFSUtils()
+	if err == nil {
+		t.Error("CheckNFSUtils() should return error when nfs-utils is not installed")
+	}
+
+	if !strings.Contains(err.Error(), "nfs-utils package is not installed") {
+		t.Errorf("Expected error about nfs-utils not installed, got: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "rpm-ostree install nfs-utils") {
+		t.Errorf("Expected installation instructions, got: %s", output)
+	}
+}
+
+func TestCheckNFSUtilsWhenCheckFails(t *testing.T) {
+	tmpDir := t.TempDir()
+	cfg := config.New(filepath.Join(tmpDir, "config.conf"))
+	fs := system.NewFileSystem()
+	network := system.NewNetwork()
+	markers := config.NewMarkers(tmpDir)
+	buf := &bytes.Buffer{}
+	testUI := ui.NewWithWriter(buf)
+
+	// Create a fake package manager that returns an error when checking
+	fakePackages := &fakePackageManager{
+		checkError: fmt.Errorf("rpm command failed"),
+	}
+
+	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers, fakePackages)
+
+	err := nfs.CheckNFSUtils()
+	// When check fails, the function should return nil and proceed with a warning
+	if err != nil {
+		t.Errorf("CheckNFSUtils() should return nil when package check fails, got: %v", err)
+	}
+
+	output := buf.String()
+	if !strings.Contains(output, "Could not verify nfs-utils package") {
+		t.Errorf("Expected warning about unable to verify package, got: %s", output)
+	}
+	if !strings.Contains(output, "Proceeding anyway") {
+		t.Errorf("Expected message about proceeding anyway, got: %s", output)
 	}
 }

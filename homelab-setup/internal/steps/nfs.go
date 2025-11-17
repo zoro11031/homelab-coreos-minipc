@@ -12,6 +12,11 @@ import (
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/ui"
 )
 
+// PackageChecker defines the interface for checking package installation status
+type PackageChecker interface {
+	IsInstalled(packageName string) (bool, error)
+}
+
 // NFSConfigurator handles NFS mount configuration
 type NFSConfigurator struct {
 	fs       *system.FileSystem
@@ -20,11 +25,11 @@ type NFSConfigurator struct {
 	ui       *ui.UI
 	markers  *config.Markers
 	runner   system.CommandRunner
-	packages *system.PackageManager
+	packages PackageChecker
 }
 
 // NewNFSConfigurator creates a new NFSConfigurator instance
-func NewNFSConfigurator(fs *system.FileSystem, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers, packages *system.PackageManager) *NFSConfigurator {
+func NewNFSConfigurator(fs *system.FileSystem, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers, packages PackageChecker) *NFSConfigurator {
 	return &NFSConfigurator{
 		fs:       fs,
 		network:  network,

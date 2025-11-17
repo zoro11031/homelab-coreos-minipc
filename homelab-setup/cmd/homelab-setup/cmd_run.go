@@ -9,12 +9,12 @@ import (
 
 var (
 	// Flags for non-interactive mode
-	nonInteractive   bool
-	dryRun           bool
-	setupUser        string
-	nfsServer        string
-	containersBase   string
-	skipWireguard    bool
+	nonInteractive bool
+	dryRun         bool
+	setupUser      string
+	nfsServer      string
+	containersBase string
+	skipWireguard  bool
 )
 
 var runCmd = &cobra.Command{
