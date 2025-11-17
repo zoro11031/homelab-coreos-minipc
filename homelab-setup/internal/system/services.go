@@ -8,16 +8,8 @@ import (
 	"strings"
 )
 
-// ServiceManager handles systemd service operations
-type ServiceManager struct{}
-
-// NewServiceManager creates a new ServiceManager instance
-func NewServiceManager() *ServiceManager {
-	return &ServiceManager{}
-}
-
 // ServiceExists checks if a systemd service unit file exists
-func (sm *ServiceManager) ServiceExists(serviceName string) (bool, error) {
+func ServiceExists(serviceName string) (bool, error) {
 	// Check in standard systemd locations
 	locations := []string{
 		filepath.Join("/etc/systemd/system", serviceName),
@@ -38,7 +30,7 @@ func (sm *ServiceManager) ServiceExists(serviceName string) (bool, error) {
 }
 
 // GetServiceLocation returns the path to a service unit file
-func (sm *ServiceManager) GetServiceLocation(serviceName string) (string, error) {
+func GetServiceLocation(serviceName string) (string, error) {
 	locations := []string{
 		filepath.Join("/etc/systemd/system", serviceName),
 		filepath.Join("/usr/lib/systemd/system", serviceName),
@@ -54,8 +46,8 @@ func (sm *ServiceManager) GetServiceLocation(serviceName string) (string, error)
 	return "", fmt.Errorf("service %s not found", serviceName)
 }
 
-// IsActive checks if a service is currently active
-func (sm *ServiceManager) IsActive(serviceName string) (bool, error) {
+// IsServiceActive checks if a service is currently active
+func IsServiceActive(serviceName string) (bool, error) {
 	cmd := exec.Command("systemctl", "is-active", "--quiet", serviceName)
 	err := cmd.Run()
 
@@ -73,8 +65,8 @@ func (sm *ServiceManager) IsActive(serviceName string) (bool, error) {
 	return false, fmt.Errorf("failed to check service status: %w", err)
 }
 
-// IsEnabled checks if a service is enabled to start on boot
-func (sm *ServiceManager) IsEnabled(serviceName string) (bool, error) {
+// IsServiceEnabled checks if a service is enabled to start on boot
+func IsServiceEnabled(serviceName string) (bool, error) {
 	cmd := exec.Command("systemctl", "is-enabled", "--quiet", serviceName)
 	err := cmd.Run()
 
@@ -92,8 +84,8 @@ func (sm *ServiceManager) IsEnabled(serviceName string) (bool, error) {
 	return false, fmt.Errorf("failed to check if service is enabled: %w", err)
 }
 
-// Enable enables a service to start on boot
-func (sm *ServiceManager) Enable(serviceName string) error {
+// EnableService enables a service to start on boot
+func EnableService(serviceName string) error {
 	cmd := exec.Command("sudo", "-n", "systemctl", "enable", serviceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -102,8 +94,8 @@ func (sm *ServiceManager) Enable(serviceName string) error {
 	return nil
 }
 
-// Disable disables a service from starting on boot
-func (sm *ServiceManager) Disable(serviceName string) error {
+// DisableService disables a service from starting on boot
+func DisableService(serviceName string) error {
 	cmd := exec.Command("sudo", "-n", "systemctl", "disable", serviceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -112,8 +104,8 @@ func (sm *ServiceManager) Disable(serviceName string) error {
 	return nil
 }
 
-// Start starts a service
-func (sm *ServiceManager) Start(serviceName string) error {
+// StartService starts a service
+func StartService(serviceName string) error {
 	cmd := exec.Command("sudo", "-n", "systemctl", "start", serviceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -122,8 +114,8 @@ func (sm *ServiceManager) Start(serviceName string) error {
 	return nil
 }
 
-// Stop stops a service
-func (sm *ServiceManager) Stop(serviceName string) error {
+// StopService stops a service
+func StopService(serviceName string) error {
 	cmd := exec.Command("sudo", "-n", "systemctl", "stop", serviceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -132,8 +124,8 @@ func (sm *ServiceManager) Stop(serviceName string) error {
 	return nil
 }
 
-// Restart restarts a service
-func (sm *ServiceManager) Restart(serviceName string) error {
+// RestartService restarts a service
+func RestartService(serviceName string) error {
 	cmd := exec.Command("sudo", "-n", "systemctl", "restart", serviceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -142,8 +134,8 @@ func (sm *ServiceManager) Restart(serviceName string) error {
 	return nil
 }
 
-// Reload reloads a service configuration
-func (sm *ServiceManager) Reload(serviceName string) error {
+// ReloadService reloads a service configuration
+func ReloadService(serviceName string) error {
 	cmd := exec.Command("sudo", "-n", "systemctl", "reload", serviceName)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -152,8 +144,8 @@ func (sm *ServiceManager) Reload(serviceName string) error {
 	return nil
 }
 
-// DaemonReload reloads systemd manager configuration
-func (sm *ServiceManager) DaemonReload() error {
+// SystemdDaemonReload reloads systemd manager configuration
+func SystemdDaemonReload() error {
 	cmd := exec.Command("sudo", "-n", "systemctl", "daemon-reload")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -162,8 +154,8 @@ func (sm *ServiceManager) DaemonReload() error {
 	return nil
 }
 
-// GetStatus returns the status output for a service
-func (sm *ServiceManager) GetStatus(serviceName string) (string, error) {
+// GetServiceStatus returns the status output for a service
+func GetServiceStatus(serviceName string) (string, error) {
 	cmd := exec.Command("systemctl", "status", serviceName, "--no-pager", "-l")
 	output, err := cmd.CombinedOutput()
 
@@ -172,8 +164,8 @@ func (sm *ServiceManager) GetStatus(serviceName string) (string, error) {
 	return string(output), err
 }
 
-// GetJournalLogs returns recent journal logs for a service
-func (sm *ServiceManager) GetJournalLogs(serviceName string, lines int) (string, error) {
+// GetServiceJournalLogs returns recent journal logs for a service
+func GetServiceJournalLogs(serviceName string, lines int) (string, error) {
 	cmd := exec.Command("sudo", "-n", "journalctl", "-u", serviceName, "-n", fmt.Sprintf("%d", lines), "--no-pager")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -182,8 +174,8 @@ func (sm *ServiceManager) GetJournalLogs(serviceName string, lines int) (string,
 	return string(output), nil
 }
 
-// ListUnits lists all systemd units matching a pattern
-func (sm *ServiceManager) ListUnits(pattern string) ([]string, error) {
+// ListSystemdUnits lists all systemd units matching a pattern
+func ListSystemdUnits(pattern string) ([]string, error) {
 	cmd := exec.Command("systemctl", "list-units", pattern, "--no-pager", "--no-legend")
 	output, err := cmd.Output()
 	if err != nil {
@@ -207,18 +199,8 @@ func (sm *ServiceManager) ListUnits(pattern string) ([]string, error) {
 	return units, nil
 }
 
-// EnableService enables a service (alias for Enable for consistency)
-func (sm *ServiceManager) EnableService(serviceName string) error {
-	return sm.Enable(serviceName)
-}
-
-// StartService starts a service (alias for Start for consistency)
-func (sm *ServiceManager) StartService(serviceName string) error {
-	return sm.Start(serviceName)
-}
-
-// RunCommand runs a shell command with the given arguments
-func (sm *ServiceManager) RunCommand(command string, args ...string) error {
+// RunSystemCommand runs a shell command with the given arguments
+func RunSystemCommand(command string, args ...string) error {
 	cmd := exec.Command(command, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr

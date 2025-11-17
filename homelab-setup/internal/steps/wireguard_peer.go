@@ -479,7 +479,7 @@ func (w *WireGuardSetup) AddPeerWorkflow(opts *WireGuardPeerWorkflowOptions) err
 		restart, err := w.ui.PromptYesNo(fmt.Sprintf("Restart wg-quick@%s now?", interfaceName), true)
 		if err == nil && restart {
 			serviceName := fmt.Sprintf("wg-quick@%s.service", interfaceName)
-			if err := w.services.Restart(serviceName); err != nil {
+			if err := system.RestartService(serviceName); err != nil {
 				w.ui.Warningf("Failed to restart %s: %v", serviceName, err)
 			} else {
 				w.ui.Successf("Service %s restarted", serviceName)

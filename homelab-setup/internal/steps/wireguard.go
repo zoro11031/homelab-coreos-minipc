@@ -33,12 +33,11 @@ type WireGuardPeer struct {
 
 // WireGuardSetup handles WireGuard VPN setup
 type WireGuardSetup struct {
-	services *system.ServiceManager
-	network  *system.Network
-	config   *config.Config
-	ui       *ui.UI
-	markers  *config.Markers
-	keygen   WireGuardKeyGenerator
+	network *system.Network
+	config  *config.Config
+	ui      *ui.UI
+	markers *config.Markers
+	keygen  WireGuardKeyGenerator
 }
 
 // WireGuardKeyGenerator describes key generation/derivation helpers so the
@@ -150,14 +149,13 @@ func sanitizeConfigValue(value string) string {
 }
 
 // NewWireGuardSetup creates a new WireGuardSetup instance
-func NewWireGuardSetup(services *system.ServiceManager, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers) *WireGuardSetup {
+func NewWireGuardSetup(network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers) *WireGuardSetup {
 	return &WireGuardSetup{
-		services: services,
-		network:  network,
-		config:   cfg,
-		ui:       ui,
-		markers:  markers,
-		keygen:   CommandKeyGenerator{},
+		network: network,
+		config:  cfg,
+		ui:      ui,
+		markers: markers,
+		keygen:  CommandKeyGenerator{},
 	}
 }
 
@@ -377,7 +375,7 @@ func (w *WireGuardSetup) EnableService(interfaceName string) error {
 	w.ui.Infof("Enabling %s...", serviceName)
 
 	// Enable service
-	if err := w.services.Enable(serviceName); err != nil {
+	if err := system.EnableService(serviceName); err != nil {
 		w.ui.Warning(fmt.Sprintf("Failed to enable service: %v", err))
 		w.ui.Info("You may need to run manually:")
 		w.ui.Infof("  sudo systemctl enable %s", serviceName)
@@ -387,7 +385,7 @@ func (w *WireGuardSetup) EnableService(interfaceName string) error {
 
 	// Start service
 	w.ui.Infof("Starting %s...", serviceName)
-	if err := w.services.Start(serviceName); err != nil {
+	if err := system.StartService(serviceName); err != nil {
 		w.ui.Warning(fmt.Sprintf("Failed to start service: %v", err))
 		w.ui.Info("You may need to run manually:")
 		w.ui.Infof("  sudo systemctl start %s", serviceName)
@@ -396,7 +394,7 @@ func (w *WireGuardSetup) EnableService(interfaceName string) error {
 	w.ui.Success("Service started")
 
 	// Check if service is actually running
-	active, err := w.services.IsActive(serviceName)
+	active, err := system.IsServiceActive(serviceName)
 	if err != nil {
 		w.ui.Warning(fmt.Sprintf("Could not verify service status: %v", err))
 	} else if active {
@@ -630,7 +628,7 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 
 		// Check if service is running and offer to restart
 		serviceName := fmt.Sprintf("wg-quick@%s.service", interfaceName)
-		active, _ := w.services.IsActive(serviceName)
+		active, _ := system.IsServiceActive(serviceName)
 
 		if active {
 			w.ui.Print("")
@@ -638,7 +636,7 @@ func (w *WireGuardSetup) AddPeers(interfaceName, publicKey, interfaceIP string) 
 			restart, err := w.ui.PromptYesNo("Restart the service now?", true)
 			if err == nil && restart {
 				w.ui.Info("Restarting service...")
-				if err := w.services.Restart(serviceName); err != nil {
+				if err := system.RestartService(serviceName); err != nil {
 					w.ui.Warning(fmt.Sprintf("Failed to restart service: %v", err))
 					w.ui.Infof("Restart manually: sudo systemctl restart %s", serviceName)
 				} else {

@@ -42,7 +42,6 @@ func NewSetupContextWithOptions(nonInteractive bool, skipWireGuard bool) (*Setup
 	// Initialize system components
 	network := system.NewNetwork()
 	containers := system.NewContainerManager()
-	services := system.NewServiceManager()
 
 	// Initialize step manager
 	stepMgr := NewStepManager(
@@ -51,7 +50,6 @@ func NewSetupContextWithOptions(nonInteractive bool, skipWireGuard bool) (*Setup
 		uiInstance,
 		network,
 		containers,
-		services,
 	)
 
 	return &SetupContext{
@@ -70,7 +68,6 @@ type StepManager struct {
 	ui         *ui.UI
 	network    *system.Network
 	containers *system.ContainerManager
-	services   *system.ServiceManager
 
 	// Step instances
 	preflight  *steps.PreflightChecker
@@ -89,7 +86,6 @@ func NewStepManager(
 	uiInstance *ui.UI,
 	network *system.Network,
 	containers *system.ContainerManager,
-	services *system.ServiceManager,
 ) *StepManager {
 	return &StepManager{
 		config:     cfg,
@@ -97,14 +93,13 @@ func NewStepManager(
 		ui:         uiInstance,
 		network:    network,
 		containers: containers,
-		services:   services,
 		preflight:  steps.NewPreflightChecker(network, uiInstance, markers, cfg),
 		user:       steps.NewUserConfigurator(cfg, uiInstance, markers),
 		directory:  steps.NewDirectorySetup(cfg, uiInstance, markers),
-		wireguard:  steps.NewWireGuardSetup(services, network, cfg, uiInstance, markers),
+		wireguard:  steps.NewWireGuardSetup(network, cfg, uiInstance, markers),
 		nfs:        steps.NewNFSConfigurator(network, cfg, uiInstance, markers),
 		container:  steps.NewContainerSetup(containers, cfg, uiInstance, markers),
-		deployment: steps.NewDeployment(containers, services, cfg, uiInstance, markers),
+		deployment: steps.NewDeployment(containers, cfg, uiInstance, markers),
 	}
 }
 
