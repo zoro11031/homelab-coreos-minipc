@@ -8,16 +8,8 @@ import (
 	"strings"
 )
 
-// UserManager handles user and group operations
-type UserManager struct{}
-
-// NewUserManager creates a new UserManager instance
-func NewUserManager() *UserManager {
-	return &UserManager{}
-}
-
 // UserExists checks if a user exists
-func (um *UserManager) UserExists(username string) (bool, error) {
+func UserExists(username string) (bool, error) {
 	_, err := user.Lookup(username)
 	if err == nil {
 		return true, nil
@@ -33,7 +25,7 @@ func (um *UserManager) UserExists(username string) (bool, error) {
 }
 
 // GroupExists checks if a group exists
-func (um *UserManager) GroupExists(groupName string) (bool, error) {
+func GroupExists(groupName string) (bool, error) {
 	_, err := user.LookupGroup(groupName)
 	if err == nil {
 		return true, nil
@@ -49,7 +41,7 @@ func (um *UserManager) GroupExists(groupName string) (bool, error) {
 }
 
 // GetUserInfo returns information about a user
-func (um *UserManager) GetUserInfo(username string) (*user.User, error) {
+func GetUserInfo(username string) (*user.User, error) {
 	u, err := user.Lookup(username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get user info for %s: %w", username, err)
@@ -58,7 +50,7 @@ func (um *UserManager) GetUserInfo(username string) (*user.User, error) {
 }
 
 // GetUID returns the UID for a username
-func (um *UserManager) GetUID(username string) (int, error) {
+func GetUID(username string) (int, error) {
 	u, err := user.Lookup(username)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get UID for %s: %w", username, err)
@@ -73,7 +65,7 @@ func (um *UserManager) GetUID(username string) (int, error) {
 }
 
 // GetGID returns the primary GID for a username
-func (um *UserManager) GetGID(username string) (int, error) {
+func GetGID(username string) (int, error) {
 	u, err := user.Lookup(username)
 	if err != nil {
 		return 0, fmt.Errorf("failed to get GID for %s: %w", username, err)
@@ -88,7 +80,7 @@ func (um *UserManager) GetGID(username string) (int, error) {
 }
 
 // GetUserGroups returns all groups a user belongs to
-func (um *UserManager) GetUserGroups(username string) ([]string, error) {
+func GetUserGroups(username string) ([]string, error) {
 	u, err := user.Lookup(username)
 	if err != nil {
 		return nil, fmt.Errorf("failed to lookup user %s: %w", username, err)
@@ -113,8 +105,8 @@ func (um *UserManager) GetUserGroups(username string) ([]string, error) {
 }
 
 // IsUserInGroup checks if a user is in a specific group
-func (um *UserManager) IsUserInGroup(username, groupName string) (bool, error) {
-	groups, err := um.GetUserGroups(username)
+func IsUserInGroup(username, groupName string) (bool, error) {
+	groups, err := GetUserGroups(username)
 	if err != nil {
 		return false, err
 	}
@@ -129,7 +121,7 @@ func (um *UserManager) IsUserInGroup(username, groupName string) (bool, error) {
 }
 
 // CreateUser creates a new user
-func (um *UserManager) CreateUser(username string, createHome bool) error {
+func CreateUser(username string, createHome bool) error {
 	args := []string{"useradd"}
 
 	if createHome {
@@ -148,7 +140,7 @@ func (um *UserManager) CreateUser(username string, createHome bool) error {
 }
 
 // DeleteUser deletes a user
-func (um *UserManager) DeleteUser(username string, removeHome bool) error {
+func DeleteUser(username string, removeHome bool) error {
 	args := []string{"userdel"}
 
 	if removeHome {
@@ -167,7 +159,7 @@ func (um *UserManager) DeleteUser(username string, removeHome bool) error {
 }
 
 // AddUserToGroup adds a user to a group
-func (um *UserManager) AddUserToGroup(username, groupName string) error {
+func AddUserToGroup(username, groupName string) error {
 	cmd := exec.Command("sudo", "-n", "usermod", "-aG", groupName, username)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -178,7 +170,7 @@ func (um *UserManager) AddUserToGroup(username, groupName string) error {
 }
 
 // SetUserShell sets the login shell for a user
-func (um *UserManager) SetUserShell(username, shell string) error {
+func SetUserShell(username, shell string) error {
 	cmd := exec.Command("sudo", "-n", "usermod", "-s", shell, username)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -189,7 +181,7 @@ func (um *UserManager) SetUserShell(username, shell string) error {
 }
 
 // GetCurrentUser returns the current user information
-func (um *UserManager) GetCurrentUser() (*user.User, error) {
+func GetCurrentUser() (*user.User, error) {
 	u, err := user.Current()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get current user: %w", err)
@@ -198,7 +190,7 @@ func (um *UserManager) GetCurrentUser() (*user.User, error) {
 }
 
 // CheckSubUIDExists checks if a user has subuid mappings
-func (um *UserManager) CheckSubUIDExists(username string) (bool, error) {
+func CheckSubUIDExists(username string) (bool, error) {
 	cmd := exec.Command("grep", "-q", fmt.Sprintf("^%s:", username), "/etc/subuid")
 	err := cmd.Run()
 
@@ -216,7 +208,7 @@ func (um *UserManager) CheckSubUIDExists(username string) (bool, error) {
 }
 
 // CheckSubGIDExists checks if a user has subgid mappings
-func (um *UserManager) CheckSubGIDExists(username string) (bool, error) {
+func CheckSubGIDExists(username string) (bool, error) {
 	cmd := exec.Command("grep", "-q", fmt.Sprintf("^%s:", username), "/etc/subgid")
 	err := cmd.Run()
 

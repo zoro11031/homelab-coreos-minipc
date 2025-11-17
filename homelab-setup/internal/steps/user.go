@@ -14,16 +14,14 @@ const defaultTimezone = "America/Chicago"
 
 // UserConfigurator handles user and group configuration
 type UserConfigurator struct {
-	users   *system.UserManager
 	config  *config.Config
 	ui      *ui.UI
 	markers *config.Markers
 }
 
 // NewUserConfigurator creates a new UserConfigurator instance
-func NewUserConfigurator(users *system.UserManager, cfg *config.Config, ui *ui.UI, markers *config.Markers) *UserConfigurator {
+func NewUserConfigurator(cfg *config.Config, ui *ui.UI, markers *config.Markers) *UserConfigurator {
 	return &UserConfigurator{
-		users:   users,
 		config:  cfg,
 		ui:      ui,
 		markers: markers,
@@ -33,7 +31,7 @@ func NewUserConfigurator(users *system.UserManager, cfg *config.Config, ui *ui.U
 // PromptForUser prompts for a homelab username or allows using current user
 func (u *UserConfigurator) PromptForUser() (string, error) {
 	// Get current user
-	currentUser, err := u.users.GetCurrentUser()
+	currentUser, err := system.GetCurrentUser()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current user: %w", err)
 	}
@@ -88,7 +86,7 @@ func (u *UserConfigurator) getConfiguredUsername() (string, error) {
 
 // ValidateUser checks if a user exists and can be used for homelab
 func (u *UserConfigurator) ValidateUser(username string) error {
-	exists, err := u.users.UserExists(username)
+	exists, err := system.UserExists(username)
 	if err != nil {
 		return fmt.Errorf("failed to check if user exists: %w", err)
 	}
@@ -98,7 +96,7 @@ func (u *UserConfigurator) ValidateUser(username string) error {
 	}
 
 	// Get user info to display
-	userInfo, err := u.users.GetUserInfo(username)
+	userInfo, err := system.GetUserInfo(username)
 	if err != nil {
 		return fmt.Errorf("failed to get user info: %w", err)
 	}
@@ -106,7 +104,7 @@ func (u *UserConfigurator) ValidateUser(username string) error {
 	u.ui.Successf("User %s found (UID: %s, GID: %s)", username, userInfo.Uid, userInfo.Gid)
 
 	// Check user groups
-	groups, err := u.users.GetUserGroups(username)
+	groups, err := system.GetUserGroups(username)
 	if err != nil {
 		return fmt.Errorf("failed to get user groups: %w", err)
 	}
@@ -114,7 +112,7 @@ func (u *UserConfigurator) ValidateUser(username string) error {
 	u.ui.Infof("User groups: %v", groups)
 
 	// Check if user is in wheel group (recommended for sudo)
-	inWheel, err := u.users.IsUserInGroup(username, "wheel")
+	inWheel, err := system.IsUserInGroup(username, "wheel")
 	if err != nil {
 		return fmt.Errorf("failed to check wheel group: %w", err)
 	}
@@ -131,7 +129,7 @@ func (u *UserConfigurator) ValidateUser(username string) error {
 
 // CreateUserIfNeeded creates a user if they don't exist
 func (u *UserConfigurator) CreateUserIfNeeded(username string) error {
-	exists, err := u.users.UserExists(username)
+	exists, err := system.UserExists(username)
 	if err != nil {
 		return fmt.Errorf("failed to check if user exists: %w", err)
 	}
@@ -155,7 +153,7 @@ func (u *UserConfigurator) CreateUserIfNeeded(username string) error {
 
 	// Create user with home directory
 	u.ui.Infof("Creating user %s...", username)
-	if err := u.users.CreateUser(username, true); err != nil {
+	if err := system.CreateUser(username, true); err != nil {
 		return fmt.Errorf("failed to create user: %w", err)
 	}
 
@@ -168,7 +166,7 @@ func (u *UserConfigurator) CreateUserIfNeeded(username string) error {
 	}
 
 	if addToWheel {
-		if err := u.users.AddUserToGroup(username, "wheel"); err != nil {
+		if err := system.AddUserToGroup(username, "wheel"); err != nil {
 			u.ui.Warning(fmt.Sprintf("Failed to add user to wheel group: %v", err))
 		} else {
 			u.ui.Success("User added to 'wheel' group")
@@ -183,7 +181,7 @@ func (u *UserConfigurator) ConfigureSubuidSubgid(username string) error {
 	u.ui.Info("Checking subuid/subgid mappings for rootless containers...")
 
 	// Check if subuid exists
-	hasSubUID, err := u.users.CheckSubUIDExists(username)
+	hasSubUID, err := system.CheckSubUIDExists(username)
 	if err != nil {
 		return fmt.Errorf("failed to check subuid: %w", err)
 	}
@@ -199,7 +197,7 @@ func (u *UserConfigurator) ConfigureSubuidSubgid(username string) error {
 	}
 
 	// Check if subgid exists
-	hasSubGID, err := u.users.CheckSubGIDExists(username)
+	hasSubGID, err := system.CheckSubGIDExists(username)
 	if err != nil {
 		return fmt.Errorf("failed to check subgid: %w", err)
 	}
@@ -250,7 +248,7 @@ func (u *UserConfigurator) SetupShell(username string) error {
 
 	// Set the shell
 	u.ui.Infof("Setting shell to %s...", selectedShell)
-	if err := u.users.SetUserShell(username, selectedShell); err != nil {
+	if err := system.SetUserShell(username, selectedShell); err != nil {
 		return fmt.Errorf("failed to set shell: %w", err)
 	}
 
@@ -336,12 +334,12 @@ func (u *UserConfigurator) Run() error {
 	}
 
 	// Get UID and GID for config
-	uid, err := u.users.GetUID(username)
+	uid, err := system.GetUID(username)
 	if err != nil {
 		return fmt.Errorf("failed to get UID: %w", err)
 	}
 
-	gid, err := u.users.GetGID(username)
+	gid, err := system.GetGID(username)
 	if err != nil {
 		return fmt.Errorf("failed to get GID: %w", err)
 	}
