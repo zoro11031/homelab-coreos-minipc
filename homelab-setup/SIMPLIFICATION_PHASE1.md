@@ -89,11 +89,10 @@ make build  # Should still compile
 
 ---
 
-### Step 2: Remove FileSystemManager Interface (20 minutes)
+### Step 2: Simplify filesystem implementation (20 minutes)
 
 **Current Structure:**
 ```
-internal/system/filesystem_manager.go  - Interface definition
 internal/system/filesystem.go          - Implementation
 internal/system/filesystem_mock.go     - Mock (already deleted)
 internal/system/filesystem_dryrun.go   - Dry-run mode (already deleted)
@@ -101,38 +100,12 @@ internal/system/filesystem_dryrun.go   - Dry-run mode (already deleted)
 
 **Actions:**
 
-1. **Delete interface file:**
-   ```bash
-   rm homelab-setup/internal/system/filesystem_manager.go
-   ```
-
-2. **Simplify filesystem.go:**
-   - Remove `FileSystem` struct
-   - Remove `NewFileSystem()` constructor
-   - Convert methods to functions:
-     ```go
-     // Before:
-     func (fs *FileSystem) CreateDirectory(path, owner string, perms os.FileMode) error
-
-     // After:
-     func CreateDirectory(path, owner string, perms os.FileMode) error
-     ```
-
-3. **Update all callers:**
-   Search for `fs.CreateDirectory`, `fs.WriteFile`, etc.
-   Replace with direct function calls: `system.CreateDirectory`, `system.WriteFile`
-
-   Files to update:
-   - `internal/steps/directory.go`
-   - `internal/steps/wireguard.go`
-   - `internal/steps/nfs.go`
-   - `internal/steps/container.go`
-   - Any other steps using filesystem operations
+1. Keep filesystem helpers consolidated in `filesystem.go` with direct function calls.
+2. Remove any lingering abstractions that no longer provide value after consolidation.
 
 **Verification:**
 ```bash
-grep -r "FileSystemManager" homelab-setup/  # Should return nothing
-grep -r "NewFileSystem()" homelab-setup/     # Should return nothing
+rg "filesystem" homelab-setup/internal/system
 make build
 ```
 
@@ -374,7 +347,7 @@ make build
 **Critical:** Follow this exact order to maintain buildability:
 
 1. ✅ Remove test files (safe, no dependencies)
-2. ✅ Remove FileSystemManager interface
+2. ✅ Simplify filesystem helpers
 3. ✅ Remove individual manager structs (one at a time, verify build after each)
 4. ✅ Simplify SetupContext/StepManager
 5. ✅ Remove Cobra framework (last, touches entry point)

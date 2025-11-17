@@ -208,7 +208,7 @@ func (d *Deployment) PullImages(serviceInfo *ServiceInfo) error {
 	}
 	cmdParts = append(cmdParts, "pull")
 
-	if err := system.RunSystemCommand(cmdParts[0], cmdParts[1:]...); err != nil{
+	if err := system.RunSystemCommand(cmdParts[0], cmdParts[1:]...); err != nil {
 		d.ui.Error(fmt.Sprintf("Failed to pull images: %v", err))
 		d.ui.Info("You may need to pull images manually later")
 		return nil // Non-critical error, continue

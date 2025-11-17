@@ -351,7 +351,7 @@ WantedBy=multi-user.target
 `, mountPoint, mountPoint)
 
 	// Write the mount unit file.
-	if err := system.WriteFile(mountUnitPath, []byte(mountContent), 0644); err != nil{
+	if err := system.WriteFile(mountUnitPath, []byte(mountContent), 0644); err != nil {
 		return fmt.Errorf("failed to write mount unit %s: %w", mountUnitPath, err)
 	}
 	n.ui.Successf("Created mount unit: %s", mountUnitPath)

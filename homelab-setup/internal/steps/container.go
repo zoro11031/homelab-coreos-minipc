@@ -580,7 +580,7 @@ func (c *ContainerSetup) CreateEnvFiles(selectedStacks []string) error {
 		}
 
 		// Set ownership
-		if err := system.Chown(envPath, fmt.Sprintf("%s:%s", setupUser, setupUser)); err != nil{
+		if err := system.Chown(envPath, fmt.Sprintf("%s:%s", setupUser, setupUser)); err != nil {
 			return fmt.Errorf("failed to set ownership on %s: %w", envPath, err)
 		}
 
