@@ -285,20 +285,6 @@ func (n *NFSConfigurator) CreateMountPoint(mountPoint string) error {
 	return nil
 }
 
-// mountPointToUnitName converts a mount point path to a systemd unit name
-// using simple string replacement (no systemd-escape).
-// Example: "/mnt/nas-media" -> "mnt-nas-media.mount"
-func mountPointToUnitName(mountPoint string) string {
-	// Strip leading "/" if present
-	name := strings.TrimPrefix(mountPoint, "/")
-
-	// Replace remaining "/" with "-"
-	name = strings.ReplaceAll(name, "/", "-")
-
-	// Append ".mount"
-	return name + ".mount"
-}
-
 // getNFSMountOptions returns the NFS mount options from config or a default
 func (n *NFSConfigurator) getNFSMountOptions() string {
 	options := n.config.GetOrDefault("NFS_MOUNT_OPTIONS", "")
@@ -312,9 +298,12 @@ func (n *NFSConfigurator) getNFSMountOptions() string {
 func (n *NFSConfigurator) CreateSystemdMountUnit(host, export, mountPoint string) error {
 	n.ui.Info("Creating systemd mount unit...")
 
-	// Convert mount point to systemd unit name using simple string replacement
-	// Example: /mnt/nas-media -> mnt-nas-media.mount
-	unitName := mountPointToUnitName(mountPoint)
+	// Convert mount point to systemd unit name using systemd-escape
+	// Example: /mnt/nas-media -> mnt-nas\x2dmedia.mount
+	unitName, err := pathToUnitName(n.runner, mountPoint)
+	if err != nil {
+		return fmt.Errorf("failed to escape mount point %s: %w", mountPoint, err)
+	}
 	unitPath := filepath.Join("/etc/systemd/system", unitName)
 
 	n.ui.Infof("Creating mount unit: %s", unitName)
