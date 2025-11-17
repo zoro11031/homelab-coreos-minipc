@@ -144,25 +144,25 @@ func TestCreateSystemdUnits(t *testing.T) {
 	}
 }
 
-func TestMountPointToUnitName(t *testing.T) {
+func TestMountPointToUnitBaseName(t *testing.T) {
 	tests := []struct {
 		name       string
 		mountPoint string
 		expected   string
 	}{
-		{name: "canonical path", mountPoint: "/mnt/nas-media", expected: "mnt-nas-media.mount"},
-		{name: "trailing slash", mountPoint: "/mnt/nas-media/", expected: "mnt-nas-media.mount"},
-		{name: "multiple trailing slashes", mountPoint: "/mnt/nas-media///", expected: "mnt-nas-media.mount"},
-		{name: "whitespace replaced", mountPoint: "/mnt/My Media", expected: "mnt-My-Media.mount"},
-		{name: "multiple whitespaces", mountPoint: "/mnt/My  Media", expected: "mnt-My-Media.mount"},
-		{name: "leading and trailing spaces", mountPoint: " /mnt/My Media ", expected: "mnt-My-Media.mount"},
-		{name: "path with multiple subdirs", mountPoint: "/srv/data/long/path", expected: "srv-data-long-path.mount"},
+		{name: "canonical path", mountPoint: "/mnt/nas-media", expected: "mnt-nas-media"},
+		{name: "trailing slash", mountPoint: "/mnt/nas-media/", expected: "mnt-nas-media"},
+		{name: "multiple trailing slashes", mountPoint: "/mnt/nas-media///", expected: "mnt-nas-media"},
+		{name: "whitespace replaced", mountPoint: "/mnt/My Media", expected: "mnt-My-Media"},
+		{name: "multiple whitespaces", mountPoint: "/mnt/My  Media", expected: "mnt-My-Media"},
+		{name: "leading and trailing spaces", mountPoint: " /mnt/My Media ", expected: "mnt-My-Media"},
+		{name: "path with multiple subdirs", mountPoint: "/srv/data/long/path", expected: "srv-data-long-path"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := mountPointToUnitName(tt.mountPoint); got != tt.expected {
-				t.Fatalf("mountPointToUnitName(%q) = %q, want %q", tt.mountPoint, got, tt.expected)
+			if got := mountPointToUnitBaseName(tt.mountPoint); got != tt.expected {
+				t.Fatalf("mountPointToUnitBaseName(%q) = %q, want %q", tt.mountPoint, got, tt.expected)
 			}
 		})
 	}

@@ -282,18 +282,12 @@ func (n *NFSConfigurator) CreateMountPoint(mountPoint string) error {
 	return nil
 }
 
-// mountPointToUnitName converts a mount point path to a systemd unit name
-// using simple string replacement (no systemd-escape).
-// Example: "/mnt/nas-media" -> "mnt-nas-media.mount"
-func mountPointToUnitName(mountPoint string) string {
+// mountPointToUnitBaseName converts a mount point path to a systemd unit base name.
+// Example: "/mnt/nas-media" -> "mnt-nas-media"
+func mountPointToUnitBaseName(mountPoint string) string {
 	// Trim leading/trailing whitespace first
 	cleanedPath := strings.TrimSpace(mountPoint)
 	cleanedPath = filepath.Clean(cleanedPath)
-
-	// Remove trailing path separator (but keep root "/")
-	if len(cleanedPath) > 1 && strings.HasSuffix(cleanedPath, string(filepath.Separator)) {
-		cleanedPath = strings.TrimSuffix(cleanedPath, string(filepath.Separator))
-	}
 
 	// Strip leading "/" if present
 	name := strings.TrimPrefix(cleanedPath, "/")
@@ -304,8 +298,7 @@ func mountPointToUnitName(mountPoint string) string {
 	// Replace any whitespace with "-" to keep systemd filenames valid
 	name = strings.Join(strings.FieldsFunc(name, unicode.IsSpace), "-")
 
-	// Append ".mount"
-	return name + ".mount"
+	return name
 }
 
 // getNFSMountOptions returns the NFS mount options from config or a default
@@ -323,8 +316,7 @@ func (n *NFSConfigurator) CreateSystemdUnits(host, export, mountPoint string) er
 
 	// Convert mount point to systemd unit name.
 	// Example: /mnt/nas-media -> mnt-nas-media
-	unitBaseName := mountPointToUnitName(mountPoint)
-	unitBaseName = strings.TrimSuffix(unitBaseName, ".mount")
+	unitBaseName := mountPointToUnitBaseName(mountPoint)
 
 	mountUnitName := unitBaseName + ".mount"
 	automountUnitName := unitBaseName + ".automount"
