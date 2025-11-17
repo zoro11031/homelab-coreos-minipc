@@ -422,20 +422,12 @@ func (c *ContainerSetup) configureCloudEnv() error {
 	c.ui.Info("Nextcloud Setup:")
 	c.ui.Print("")
 
-	nextcloudAdminUser, err := c.ui.PromptInput("Nextcloud admin username", "admin")
+	nextcloudDBUser, err := c.ui.PromptInput("Nextcloud database username", "nc_user")
 	if err != nil {
 		return err
 	}
-	if err := c.config.Set("NEXTCLOUD_ADMIN_USER", nextcloudAdminUser); err != nil {
-		return fmt.Errorf("failed to save NEXTCLOUD_ADMIN_USER: %w", err)
-	}
-
-	nextcloudAdminPass, err := c.ui.PromptPasswordConfirm("Nextcloud admin password")
-	if err != nil {
-		return err
-	}
-	if err := c.config.Set("NEXTCLOUD_ADMIN_PASSWORD", nextcloudAdminPass); err != nil {
-		return fmt.Errorf("failed to save NEXTCLOUD_ADMIN_PASSWORD: %w", err)
+	if err := c.config.Set("NEXTCLOUD_DB_USERNAME", nextcloudDBUser); err != nil {
+		return fmt.Errorf("failed to save NEXTCLOUD_DB_USERNAME: %w", err)
 	}
 
 	nextcloudDBPass, err := c.ui.PromptPasswordConfirm("Nextcloud database password")
@@ -446,6 +438,14 @@ func (c *ContainerSetup) configureCloudEnv() error {
 		return fmt.Errorf("failed to save NEXTCLOUD_DB_PASSWORD: %w", err)
 	}
 
+	nextcloudDBName, err := c.ui.PromptInput("Nextcloud database name", "nextcloud")
+	if err != nil {
+		return err
+	}
+	if err := c.config.Set("NEXTCLOUD_DB_DATABASE", nextcloudDBName); err != nil {
+		return fmt.Errorf("failed to save NEXTCLOUD_DB_DATABASE: %w", err)
+	}
+
 	nextcloudDomain, err := c.ui.PromptInput("Nextcloud trusted domain (e.g., cloud.example.com)", "localhost")
 	if err != nil {
 		return err
@@ -453,13 +453,41 @@ func (c *ContainerSetup) configureCloudEnv() error {
 	if err := c.config.Set("NEXTCLOUD_TRUSTED_DOMAINS", nextcloudDomain); err != nil {
 		return fmt.Errorf("failed to save NEXTCLOUD_TRUSTED_DOMAINS: %w", err)
 	}
+	if err := c.config.Set("NEXTCLOUD_OVERWRITE_HOST", nextcloudDomain); err != nil {
+		return fmt.Errorf("failed to save NEXTCLOUD_OVERWRITE_HOST: %w", err)
+	}
+
+	// PHP limits
+	phpMemory, err := c.ui.PromptInput("Nextcloud PHP memory limit", "1024M")
+	if err != nil {
+		return err
+	}
+	if err := c.config.Set("NEXTCLOUD_PHP_MEMORY_LIMIT", phpMemory); err != nil {
+		return fmt.Errorf("failed to save NEXTCLOUD_PHP_MEMORY_LIMIT: %w", err)
+	}
+
+	phpUpload, err := c.ui.PromptInput("Nextcloud PHP upload limit", "1024M")
+	if err != nil {
+		return err
+	}
+	if err := c.config.Set("NEXTCLOUD_PHP_UPLOAD_LIMIT", phpUpload); err != nil {
+		return fmt.Errorf("failed to save NEXTCLOUD_PHP_UPLOAD_LIMIT: %w", err)
+	}
 
 	// Collabora configuration
 	c.ui.Print("")
-	c.ui.Info("Collabora Setup:")
+	c.ui.Info("Collabora Setup (optional - press Enter to skip):")
 	c.ui.Print("")
 
-	collaboraPass, err := c.ui.PromptPasswordConfirm("Collabora admin password")
+	collaboraUser, err := c.ui.PromptInput("Collabora username (optional)", "admin")
+	if err != nil {
+		return err
+	}
+	if err := c.config.Set("COLLABORA_USERNAME", collaboraUser); err != nil {
+		return fmt.Errorf("failed to save COLLABORA_USERNAME: %w", err)
+	}
+
+	collaboraPass, err := c.ui.PromptPassword("Collabora admin password (optional)")
 	if err != nil {
 		return err
 	}
@@ -478,6 +506,14 @@ func (c *ContainerSetup) configureCloudEnv() error {
 	c.ui.Info("Immich Setup:")
 	c.ui.Print("")
 
+	immichDBUser, err := c.ui.PromptInput("Immich database username", "postgres")
+	if err != nil {
+		return err
+	}
+	if err := c.config.Set("IMMICH_DB_USERNAME", immichDBUser); err != nil {
+		return fmt.Errorf("failed to save IMMICH_DB_USERNAME: %w", err)
+	}
+
 	immichDBPass, err := c.ui.PromptPasswordConfirm("Immich database password")
 	if err != nil {
 		return err
@@ -486,22 +522,12 @@ func (c *ContainerSetup) configureCloudEnv() error {
 		return fmt.Errorf("failed to save IMMICH_DB_PASSWORD: %w", err)
 	}
 
-	// Postgres user
-	postgresUser, err := c.ui.PromptInput("PostgreSQL username", "homelab")
+	immichDBName, err := c.ui.PromptInput("Immich database name", "immich")
 	if err != nil {
 		return err
 	}
-	if err := c.config.Set("POSTGRES_USER", postgresUser); err != nil {
-		return fmt.Errorf("failed to save POSTGRES_USER: %w", err)
-	}
-
-	// Redis password
-	redisPass, err := c.ui.PromptPasswordConfirm("Redis password")
-	if err != nil {
-		return err
-	}
-	if err := c.config.Set("REDIS_PASSWORD", redisPass); err != nil {
-		return fmt.Errorf("failed to save REDIS_PASSWORD: %w", err)
+	if err := c.config.Set("IMMICH_DB_DATABASE", immichDBName); err != nil {
+		return fmt.Errorf("failed to save IMMICH_DB_DATABASE: %w", err)
 	}
 
 	return nil
@@ -563,6 +589,7 @@ APPDATA_PATH=%s
 	case "media":
 		content += fmt.Sprintf(`# Plex Configuration
 PLEX_CLAIM_TOKEN=%s
+# Get your claim token from: https://www.plex.tv/claim/
 
 # Jellyfin Configuration
 JELLYFIN_PUBLIC_URL=%s
@@ -571,48 +598,65 @@ JELLYFIN_PUBLIC_URL=%s
 # Intel QuickSync device for hardware transcoding
 TRANSCODE_DEVICE=/dev/dri
 
+# Media Paths (configured during NFS setup)
+# These paths should match your NFS mount points
+# /mnt/nas-media - Main media library
+
 `, c.config.GetOrDefault("PLEX_CLAIM_TOKEN", ""),
 			c.config.GetOrDefault("JELLYFIN_PUBLIC_URL", ""))
 
 	case "web":
-		content += fmt.Sprintf(`# Overseerr Configuration
+		content += fmt.Sprintf(`# Overseerr Configuration (optional - configure in UI)
 OVERSEERR_API_KEY=%s
 
-# Web Service Ports
+# Web Service Ports (default values from compose file)
 OVERSEERR_PORT=5055
 WIZARR_PORT=5690
 ORGANIZR_PORT=9983
 HOMEPAGE_PORT=3000
 
+# Note: These services are typically accessed via reverse proxy
+# Configure your VPS Nginx Proxy Manager to route to these ports
+
 `, c.config.GetOrDefault("OVERSEERR_API_KEY", ""))
 
 	case "cloud":
-		content += fmt.Sprintf(`# Nextcloud Configuration
-NEXTCLOUD_ADMIN_USER=%s
-NEXTCLOUD_ADMIN_PASSWORD=%s
+		content += fmt.Sprintf(`# Nextcloud Database Configuration
+NEXTCLOUD_DB_USERNAME=%s
 NEXTCLOUD_DB_PASSWORD=%s
-NEXTCLOUD_TRUSTED_DOMAINS=%s
+NEXTCLOUD_DB_DATABASE=%s
 
-# Collabora Configuration
+# Nextcloud Domain Configuration
+NEXTCLOUD_TRUSTED_DOMAINS=%s
+NEXTCLOUD_OVERWRITE_HOST=%s
+
+# Nextcloud PHP Limits
+NEXTCLOUD_PHP_MEMORY_LIMIT=%s
+NEXTCLOUD_PHP_UPLOAD_LIMIT=%s
+
+# Collabora Online Configuration (optional)
+COLLABORA_USERNAME=%s
 COLLABORA_PASSWORD=%s
 COLLABORA_DOMAIN=%s
 
-# Immich Configuration
+# Immich Database Configuration
+IMMICH_DB_USERNAME=%s
 IMMICH_DB_PASSWORD=%s
+IMMICH_DB_DATABASE=%s
 
-# Database Configuration
-POSTGRES_USER=%s
-REDIS_PASSWORD=%s
-
-`, c.config.GetOrDefault("NEXTCLOUD_ADMIN_USER", "admin"),
-			c.config.GetOrDefault("NEXTCLOUD_ADMIN_PASSWORD", ""),
+`, c.config.GetOrDefault("NEXTCLOUD_DB_USERNAME", "nc_user"),
 			c.config.GetOrDefault("NEXTCLOUD_DB_PASSWORD", ""),
+			c.config.GetOrDefault("NEXTCLOUD_DB_DATABASE", "nextcloud"),
 			c.config.GetOrDefault("NEXTCLOUD_TRUSTED_DOMAINS", "localhost"),
+			c.config.GetOrDefault("NEXTCLOUD_OVERWRITE_HOST", "localhost"),
+			c.config.GetOrDefault("NEXTCLOUD_PHP_MEMORY_LIMIT", "1024M"),
+			c.config.GetOrDefault("NEXTCLOUD_PHP_UPLOAD_LIMIT", "1024M"),
+			c.config.GetOrDefault("COLLABORA_USERNAME", "admin"),
 			c.config.GetOrDefault("COLLABORA_PASSWORD", ""),
 			c.config.GetOrDefault("COLLABORA_DOMAIN", "localhost"),
+			c.config.GetOrDefault("IMMICH_DB_USERNAME", "postgres"),
 			c.config.GetOrDefault("IMMICH_DB_PASSWORD", ""),
-			c.config.GetOrDefault("POSTGRES_USER", "homelab"),
-			c.config.GetOrDefault("REDIS_PASSWORD", ""))
+			c.config.GetOrDefault("IMMICH_DB_DATABASE", "immich"))
 	}
 
 	return content
