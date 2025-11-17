@@ -217,7 +217,7 @@ func TestPathToUnitName(t *testing.T) {
 		{"/mnt/nas-nextcloud", "mnt-nas-nextcloud.mount"},
 		{"/srv/data", "srv-data.mount"},
 		{"/mnt/foo/bar/baz", "mnt-foo-bar-baz.mount"},
-		{"/mnt/My Media", "mnt-My Media.mount"},
+		{"/mnt/My Media", "mnt-My-Media.mount"},
 	}
 
 	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{}}
@@ -242,6 +242,7 @@ func TestMountPointToUnitName(t *testing.T) {
 		{name: "canonical path", mountPoint: "/mnt/nas-media", expected: "mnt-nas-media.mount"},
 		{name: "trailing slash", mountPoint: "/mnt/nas-media/", expected: "mnt-nas-media.mount"},
 		{name: "multiple trailing slashes", mountPoint: "/mnt/nas-media///", expected: "mnt-nas-media.mount"},
+		{name: "whitespace replaced", mountPoint: "/mnt/My Media", expected: "mnt-My-Media.mount"},
 	}
 
 	for _, tt := range tests {

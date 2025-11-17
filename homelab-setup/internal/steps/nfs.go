@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"unicode"
 
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/common"
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
@@ -307,6 +308,9 @@ func mountPointToUnitName(mountPoint string) string {
 	// Replace remaining "/" with "-"
 	name = strings.ReplaceAll(name, "/", "-")
 
+	// Replace any whitespace with "-" to keep systemd filenames valid
+	name = strings.Join(strings.FieldsFunc(name, unicode.IsSpace), "-")
+
 	// Append ".mount"
 	return name + ".mount"
 }
@@ -550,6 +554,12 @@ func (n *NFSConfigurator) Run() error {
 	n.ui.Step("Creating Systemd Mount Unit")
 	if err := n.CreateSystemdMountUnit(host, export, mountPoint); err != nil {
 		return fmt.Errorf("failed to create systemd mount unit: %w", err)
+	}
+
+	// Keep /etc/fstab entry in sync for compatibility
+	n.ui.Step("Updating /etc/fstab")
+	if err := n.AddToFstab(host, export, mountPoint); err != nil {
+		return fmt.Errorf("failed to update /etc/fstab: %w", err)
 	}
 
 	// Start the mount unit
