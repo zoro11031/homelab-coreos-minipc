@@ -11,17 +11,9 @@ import (
 	"syscall"
 )
 
-// FileSystem handles file system operations
-type FileSystem struct{}
-
-// NewFileSystem creates a new FileSystem instance
-func NewFileSystem() *FileSystem {
-	return &FileSystem{}
-}
-
 // EnsureDirectory creates a directory with specified owner and permissions
 // If the directory already exists, it does nothing
-func (fs *FileSystem) EnsureDirectory(path string, owner string, perms os.FileMode) error {
+func EnsureDirectory(path string, owner string, perms os.FileMode) error {
 	// Check if directory exists
 	if info, err := os.Stat(path); err == nil {
 		if !info.IsDir() {
@@ -41,13 +33,13 @@ func (fs *FileSystem) EnsureDirectory(path string, owner string, perms os.FileMo
 
 	// Set ownership if specified
 	if owner != "" {
-		if err := fs.Chown(path, owner); err != nil {
+		if err := Chown(path, owner); err != nil {
 			return fmt.Errorf("failed to set ownership on %s: %w", path, err)
 		}
 	}
 
 	// Set permissions
-	if err := fs.Chmod(path, perms); err != nil {
+	if err := Chmod(path, perms); err != nil {
 		return fmt.Errorf("failed to set permissions on %s: %w", path, err)
 	}
 
@@ -56,7 +48,7 @@ func (fs *FileSystem) EnsureDirectory(path string, owner string, perms os.FileMo
 
 // Chown changes the owner of a file or directory
 // owner should be in format "user:group" or just "user"
-func (fs *FileSystem) Chown(path string, owner string) error {
+func Chown(path string, owner string) error {
 	cmd := exec.Command("sudo", "-n", "chown", owner, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to chown %s to %s: %w\nOutput: %s", path, owner, err, string(output))
@@ -65,7 +57,7 @@ func (fs *FileSystem) Chown(path string, owner string) error {
 }
 
 // ChownRecursive changes the owner of a file or directory recursively
-func (fs *FileSystem) ChownRecursive(path string, owner string) error {
+func ChownRecursive(path string, owner string) error {
 	cmd := exec.Command("sudo", "-n", "chown", "-R", owner, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to chown -R %s to %s: %w\nOutput: %s", path, owner, err, string(output))
@@ -74,7 +66,7 @@ func (fs *FileSystem) ChownRecursive(path string, owner string) error {
 }
 
 // Chmod changes the permissions of a file or directory
-func (fs *FileSystem) Chmod(path string, perms os.FileMode) error {
+func Chmod(path string, perms os.FileMode) error {
 	permStr := fmt.Sprintf("%o", perms)
 	cmd := exec.Command("sudo", "-n", "chmod", permStr, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -84,7 +76,7 @@ func (fs *FileSystem) Chmod(path string, perms os.FileMode) error {
 }
 
 // ChmodRecursive changes permissions recursively
-func (fs *FileSystem) ChmodRecursive(path string, perms os.FileMode) error {
+func ChmodRecursive(path string, perms os.FileMode) error {
 	permStr := fmt.Sprintf("%o", perms)
 	cmd := exec.Command("sudo", "-n", "chmod", "-R", permStr, path)
 	if output, err := cmd.CombinedOutput(); err != nil {
@@ -94,7 +86,7 @@ func (fs *FileSystem) ChmodRecursive(path string, perms os.FileMode) error {
 }
 
 // FileExists checks if a file exists
-func (fs *FileSystem) FileExists(path string) (bool, error) {
+func FileExists(path string) (bool, error) {
 	_, err := os.Stat(path)
 	if err == nil {
 		return true, nil
@@ -116,7 +108,7 @@ func (fs *FileSystem) FileExists(path string) (bool, error) {
 }
 
 // DirectoryExists checks if a directory exists
-func (fs *FileSystem) DirectoryExists(path string) (bool, error) {
+func DirectoryExists(path string) (bool, error) {
 	info, err := os.Stat(path)
 	if err == nil {
 		return info.IsDir(), nil
@@ -128,7 +120,7 @@ func (fs *FileSystem) DirectoryExists(path string) (bool, error) {
 }
 
 // GetOwner returns the owner (user:group) of a file or directory
-func (fs *FileSystem) GetOwner(path string) (string, error) {
+func GetOwner(path string) (string, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return "", fmt.Errorf("failed to stat %s: %w", path, err)
@@ -152,7 +144,7 @@ func (fs *FileSystem) GetOwner(path string) (string, error) {
 }
 
 // GetPermissions returns the permissions of a file or directory
-func (fs *FileSystem) GetPermissions(path string) (os.FileMode, error) {
+func GetPermissions(path string) (os.FileMode, error) {
 	info, err := os.Stat(path)
 	if err == nil {
 		return info.Mode().Perm(), nil
@@ -176,7 +168,7 @@ func (fs *FileSystem) GetPermissions(path string) (os.FileMode, error) {
 // RemoveDirectory removes a directory and all its contents
 // Security note: This uses sudo rm -rf which is dangerous.
 // Safety checks are in place to prevent accidental deletion of critical directories.
-func (fs *FileSystem) RemoveDirectory(path string) error {
+func RemoveDirectory(path string) error {
 	// Safety checks to prevent accidental deletion of critical directories
 	if path == "" {
 		return fmt.Errorf("refusing to remove empty path")
@@ -219,7 +211,7 @@ func (fs *FileSystem) RemoveDirectory(path string) error {
 }
 
 // RemoveFile removes a file
-func (fs *FileSystem) RemoveFile(path string) error {
+func RemoveFile(path string) error {
 	cmd := exec.Command("sudo", "-n", "rm", "-f", path)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to remove file %s: %w\nOutput: %s", path, err, string(output))
@@ -228,7 +220,7 @@ func (fs *FileSystem) RemoveFile(path string) error {
 }
 
 // CopyFile copies a file from src to dst
-func (fs *FileSystem) CopyFile(src, dst string) error {
+func CopyFile(src, dst string) error {
 	cmd := exec.Command("sudo", "-n", "cp", src, dst)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to copy %s to %s: %w\nOutput: %s", src, dst, err, string(output))
@@ -237,8 +229,8 @@ func (fs *FileSystem) CopyFile(src, dst string) error {
 }
 
 // BackupFile creates a backup of a file with timestamp suffix
-func (fs *FileSystem) BackupFile(path string) (string, error) {
-	exists, err := fs.FileExists(path)
+func BackupFile(path string) (string, error) {
+	exists, err := FileExists(path)
 	if err != nil {
 		return "", err
 	}
@@ -260,7 +252,7 @@ func (fs *FileSystem) BackupFile(path string) (string, error) {
 
 	backupPath := fmt.Sprintf("%s.backup.%s", path, timestampStr)
 
-	if err := fs.CopyFile(path, backupPath); err != nil {
+	if err := CopyFile(path, backupPath); err != nil {
 		return "", fmt.Errorf("failed to create backup: %w", err)
 	}
 
@@ -268,7 +260,7 @@ func (fs *FileSystem) BackupFile(path string) (string, error) {
 }
 
 // GetDiskUsage returns disk usage information for a path
-func (fs *FileSystem) GetDiskUsage(path string) (total, used, free uint64, err error) {
+func GetDiskUsage(path string) (total, used, free uint64, err error) {
 	var stat syscall.Statfs_t
 	if err := syscall.Statfs(path, &stat); err != nil {
 		return 0, 0, 0, fmt.Errorf("failed to get disk usage for %s: %w", path, err)
@@ -283,7 +275,7 @@ func (fs *FileSystem) GetDiskUsage(path string) (total, used, free uint64, err e
 }
 
 // GetDiskUsageHuman returns human-readable disk usage for a path
-func (fs *FileSystem) GetDiskUsageHuman(path string) (string, error) {
+func GetDiskUsageHuman(path string) (string, error) {
 	cmd := exec.Command("df", "-h", path)
 	output, err := cmd.Output()
 	if err != nil {
@@ -294,7 +286,7 @@ func (fs *FileSystem) GetDiskUsageHuman(path string) (string, error) {
 }
 
 // CountFiles counts the number of files in a directory (non-recursive)
-func (fs *FileSystem) CountFiles(path string) (int, error) {
+func CountFiles(path string) (int, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return 0, fmt.Errorf("failed to read directory %s: %w", path, err)
@@ -311,7 +303,7 @@ func (fs *FileSystem) CountFiles(path string) (int, error) {
 }
 
 // ListDirectory lists all entries in a directory
-func (fs *FileSystem) ListDirectory(path string) ([]string, error) {
+func ListDirectory(path string) ([]string, error) {
 	entries, err := os.ReadDir(path)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read directory %s: %w", path, err)
@@ -326,7 +318,7 @@ func (fs *FileSystem) ListDirectory(path string) ([]string, error) {
 }
 
 // CreateSymlink creates a symbolic link
-func (fs *FileSystem) CreateSymlink(target, linkPath string) error {
+func CreateSymlink(target, linkPath string) error {
 	cmd := exec.Command("sudo", "-n", "ln", "-sf", target, linkPath)
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("failed to create symlink %s -> %s: %w\nOutput: %s", linkPath, target, err, string(output))
@@ -337,8 +329,8 @@ func (fs *FileSystem) CreateSymlink(target, linkPath string) error {
 // WriteFile writes content to a file. It first attempts a direct write using the
 // current user's permissions and only falls back to sudo if that fails with
 // os.ErrPermission.
-func (fs *FileSystem) WriteFile(path string, content []byte, perms os.FileMode) error {
-	if err := fs.writeFileDirect(path, content, perms); err == nil {
+func WriteFile(path string, content []byte, perms os.FileMode) error {
+	if err := writeFileDirect(path, content, perms); err == nil {
 		return nil
 	} else if !errors.Is(err, os.ErrPermission) {
 		return err
@@ -367,17 +359,17 @@ func (fs *FileSystem) WriteFile(path string, content []byte, perms os.FileMode) 
 
 	// Set ownership to root:root for security
 	// (temp file was created by unprivileged user)
-	if err := fs.Chown(path, "root:root"); err != nil {
+	if err := Chown(path, "root:root"); err != nil {
 		return fmt.Errorf("failed to set ownership on %s: %w", path, err)
 	}
 
 	// Set permissions
-	return fs.Chmod(path, perms)
+	return Chmod(path, perms)
 }
 
 // writeFileDirect attempts to write the file without sudo by creating a
 // temporary file in the target directory and renaming it into place.
-func (fs *FileSystem) writeFileDirect(path string, content []byte, perms os.FileMode) error {
+func writeFileDirect(path string, content []byte, perms os.FileMode) error {
 	dir := filepath.Dir(path)
 	tmpFile, err := os.CreateTemp(dir, "homelab-setup-*")
 	if err != nil {
@@ -413,7 +405,7 @@ func (fs *FileSystem) writeFileDirect(path string, content []byte, perms os.File
 
 // ReadFile reads a file, falling back to sudo when necessary. It returns the
 // raw contents as a byte slice.
-func (fs *FileSystem) ReadFile(path string) ([]byte, error) {
+func ReadFile(path string) ([]byte, error) {
 	content, err := os.ReadFile(path)
 	if err == nil {
 		return content, nil
@@ -432,7 +424,7 @@ func (fs *FileSystem) ReadFile(path string) ([]byte, error) {
 }
 
 // GetFileSize returns the size of a file in bytes
-func (fs *FileSystem) GetFileSize(path string) (int64, error) {
+func GetFileSize(path string) (int64, error) {
 	info, err := os.Stat(path)
 	if err != nil {
 		return 0, fmt.Errorf("failed to stat file %s: %w", path, err)
@@ -442,7 +434,7 @@ func (fs *FileSystem) GetFileSize(path string) (int64, error) {
 }
 
 // IsMount checks if a path is a mount point
-func (fs *FileSystem) IsMount(path string) (bool, error) {
+func IsMount(path string) (bool, error) {
 	// Get stat of the path
 	pathStat, err := os.Stat(path)
 	if err != nil {

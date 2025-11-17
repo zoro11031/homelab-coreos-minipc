@@ -18,7 +18,6 @@ import (
 // ContainerSetup handles container stack setup and configuration
 type ContainerSetup struct {
 	containers *system.ContainerManager
-	fs         *system.FileSystem
 	config     *config.Config
 	ui         *ui.UI
 	markers    *config.Markers
@@ -36,10 +35,9 @@ func (c *ContainerSetup) serviceDirectory(serviceName string) string {
 }
 
 // NewContainerSetup creates a new ContainerSetup instance
-func NewContainerSetup(containers *system.ContainerManager, fs *system.FileSystem, cfg *config.Config, ui *ui.UI, markers *config.Markers) *ContainerSetup {
+func NewContainerSetup(containers *system.ContainerManager, cfg *config.Config, ui *ui.UI, markers *config.Markers) *ContainerSetup {
 	return &ContainerSetup{
 		containers: containers,
-		fs:         fs,
 		config:     cfg,
 		ui:         ui,
 		markers:    markers,
@@ -54,7 +52,7 @@ func (c *ContainerSetup) FindTemplateDirectory() (string, error) {
 	homeDir := os.Getenv("HOME")
 	templateDirHome := filepath.Join(homeDir, "setup", "compose-setup")
 
-	if exists, _ := c.fs.DirectoryExists(templateDirHome); exists {
+	if exists, _ := system.DirectoryExists(templateDirHome); exists {
 		// Count YAML files
 		count, _ := c.countYAMLFiles(templateDirHome)
 		if count > 0 {
@@ -66,7 +64,7 @@ func (c *ContainerSetup) FindTemplateDirectory() (string, error) {
 
 	// Check /usr/share as fallback
 	templateDirUsr := "/usr/share/compose-setup"
-	if exists, _ := c.fs.DirectoryExists(templateDirUsr); exists {
+	if exists, _ := system.DirectoryExists(templateDirUsr); exists {
 		count, _ := c.countYAMLFiles(templateDirUsr)
 		if count > 0 {
 			c.ui.Successf("Found templates in: %s (%d YAML file(s))", templateDirUsr, count)
@@ -279,22 +277,22 @@ func (c *ContainerSetup) CopyTemplates(templateDir string, stacks map[string]str
 		dstPath := filepath.Join(dstDir, "compose.yml")
 
 		// Ensure destination directory exists
-		if err := c.fs.EnsureDirectory(dstDir, setupUser, 0755); err != nil {
+		if err := system.EnsureDirectory(dstDir, setupUser, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", dstDir, err)
 		}
 
 		// Copy template
 		c.ui.Infof("Copying: %s → %s", templateFile, dstPath)
-		if err := c.fs.CopyFile(srcPath, dstPath); err != nil {
+		if err := system.CopyFile(srcPath, dstPath); err != nil {
 			return fmt.Errorf("failed to copy %s: %w", templateFile, err)
 		}
 
 		// Set ownership and permissions
-		if err := c.fs.Chown(dstPath, fmt.Sprintf("%s:%s", setupUser, setupUser)); err != nil {
+		if err := system.Chown(dstPath, fmt.Sprintf("%s:%s", setupUser, setupUser)); err != nil {
 			return fmt.Errorf("failed to set ownership on %s: %w", dstPath, err)
 		}
 
-		if err := c.fs.Chmod(dstPath, 0644); err != nil {
+		if err := system.Chmod(dstPath, 0644); err != nil {
 			return fmt.Errorf("failed to set permissions on %s: %w", dstPath, err)
 		}
 
@@ -302,8 +300,8 @@ func (c *ContainerSetup) CopyTemplates(templateDir string, stacks map[string]str
 
 		// Also create docker-compose.yml symlink for compatibility
 		altDstPath := filepath.Join(dstDir, "docker-compose.yml")
-		if exists, _ := c.fs.FileExists(altDstPath); !exists {
-			if err := c.fs.CreateSymlink("compose.yml", altDstPath); err != nil {
+		if exists, _ := system.FileExists(altDstPath); !exists {
+			if err := system.CreateSymlink("compose.yml", altDstPath); err != nil {
 				c.ui.Warning(fmt.Sprintf("Failed to create symlink: %v", err))
 			}
 		}
@@ -579,12 +577,12 @@ func (c *ContainerSetup) CreateEnvFiles(selectedStacks []string) error {
 		content := c.generateEnvContent(serviceName)
 
 		// Write file
-		if err := c.fs.WriteFile(envPath, []byte(content), 0600); err != nil {
+		if err := system.WriteFile(envPath, []byte(content), 0600); err != nil {
 			return fmt.Errorf("failed to write .env file for %s: %w", serviceName, err)
 		}
 
 		// Set ownership
-		if err := c.fs.Chown(envPath, fmt.Sprintf("%s:%s", setupUser, setupUser)); err != nil {
+		if err := system.Chown(envPath, fmt.Sprintf("%s:%s", setupUser, setupUser)); err != nil{
 			return fmt.Errorf("failed to set ownership on %s: %w", envPath, err)
 		}
 

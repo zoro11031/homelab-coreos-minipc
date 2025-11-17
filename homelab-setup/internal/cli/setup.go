@@ -40,10 +40,8 @@ func NewSetupContextWithOptions(nonInteractive bool, skipWireGuard bool) (*Setup
 	uiInstance.SetNonInteractive(nonInteractive)
 
 	// Initialize system components
-	packages := system.NewPackageManager()
 	network := system.NewNetwork()
 	userMgr := system.NewUserManager()
-	fs := system.NewFileSystem()
 	containers := system.NewContainerManager()
 	services := system.NewServiceManager()
 
@@ -52,10 +50,8 @@ func NewSetupContextWithOptions(nonInteractive bool, skipWireGuard bool) (*Setup
 		cfg,
 		markers,
 		uiInstance,
-		packages,
 		network,
 		userMgr,
-		fs,
 		containers,
 		services,
 	)
@@ -74,10 +70,8 @@ type StepManager struct {
 	config     *config.Config
 	markers    *config.Markers
 	ui         *ui.UI
-	packages   *system.PackageManager
 	network    *system.Network
 	userMgr    *system.UserManager
-	fs         *system.FileSystem
 	containers *system.ContainerManager
 	services   *system.ServiceManager
 
@@ -96,10 +90,8 @@ func NewStepManager(
 	cfg *config.Config,
 	markers *config.Markers,
 	uiInstance *ui.UI,
-	packages *system.PackageManager,
 	network *system.Network,
 	userMgr *system.UserManager,
-	fs *system.FileSystem,
 	containers *system.ContainerManager,
 	services *system.ServiceManager,
 ) *StepManager {
@@ -107,19 +99,17 @@ func NewStepManager(
 		config:     cfg,
 		markers:    markers,
 		ui:         uiInstance,
-		packages:   packages,
 		network:    network,
 		userMgr:    userMgr,
-		fs:         fs,
 		containers: containers,
 		services:   services,
-		preflight:  steps.NewPreflightChecker(packages, network, uiInstance, markers, cfg),
+		preflight:  steps.NewPreflightChecker(network, uiInstance, markers, cfg),
 		user:       steps.NewUserConfigurator(userMgr, cfg, uiInstance, markers),
-		directory:  steps.NewDirectorySetup(fs, cfg, uiInstance, markers),
-		wireguard:  steps.NewWireGuardSetup(packages, services, fs, network, cfg, uiInstance, markers),
-		nfs:        steps.NewNFSConfigurator(fs, network, cfg, uiInstance, markers, packages),
-		container:  steps.NewContainerSetup(containers, fs, cfg, uiInstance, markers),
-		deployment: steps.NewDeployment(containers, fs, services, cfg, uiInstance, markers),
+		directory:  steps.NewDirectorySetup(cfg, uiInstance, markers),
+		wireguard:  steps.NewWireGuardSetup(services, network, cfg, uiInstance, markers),
+		nfs:        steps.NewNFSConfigurator(network, cfg, uiInstance, markers),
+		container:  steps.NewContainerSetup(containers, cfg, uiInstance, markers),
+		deployment: steps.NewDeployment(containers, services, cfg, uiInstance, markers),
 	}
 }
 

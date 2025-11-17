@@ -12,16 +12,14 @@ import (
 
 // DirectorySetup handles directory structure creation
 type DirectorySetup struct {
-	fs      *system.FileSystem
 	config  *config.Config
 	ui      *ui.UI
 	markers *config.Markers
 }
 
 // NewDirectorySetup creates a new DirectorySetup instance
-func NewDirectorySetup(fs *system.FileSystem, cfg *config.Config, ui *ui.UI, markers *config.Markers) *DirectorySetup {
+func NewDirectorySetup(cfg *config.Config, ui *ui.UI, markers *config.Markers) *DirectorySetup {
 	return &DirectorySetup{
-		fs:      fs,
 		config:  cfg,
 		ui:      ui,
 		markers: markers,
@@ -44,7 +42,7 @@ func (d *DirectorySetup) CreateBaseStructure(baseDir, owner string) error {
 	}
 
 	// Create base containers directory
-	if err := d.fs.EnsureDirectory(baseDir, owner, 0755); err != nil {
+	if err := system.EnsureDirectory(baseDir, owner, 0755); err != nil {
 		return fmt.Errorf("failed to create base directory %s: %w", baseDir, err)
 	}
 	d.ui.Successf("  ✓ Created %s", baseDir)
@@ -54,7 +52,7 @@ func (d *DirectorySetup) CreateBaseStructure(baseDir, owner string) error {
 		svcPath := filepath.Join(baseDir, svc.name)
 		d.ui.Infof("Creating %s - %s", svcPath, svc.description)
 
-		if err := d.fs.EnsureDirectory(svcPath, owner, 0755); err != nil {
+		if err := system.EnsureDirectory(svcPath, owner, 0755); err != nil {
 			return fmt.Errorf("failed to create directory %s: %w", svcPath, err)
 		}
 
@@ -89,7 +87,7 @@ func (d *DirectorySetup) CreateAppdataDirs(appdataBase, owner string) error {
 	}
 
 	// Create base appdata directory
-	if err := d.fs.EnsureDirectory(appdataBase, owner, 0755); err != nil {
+	if err := system.EnsureDirectory(appdataBase, owner, 0755); err != nil {
 		return fmt.Errorf("failed to create appdata base directory %s: %w", appdataBase, err)
 	}
 	d.ui.Successf("  ✓ Created %s", appdataBase)
@@ -98,7 +96,7 @@ func (d *DirectorySetup) CreateAppdataDirs(appdataBase, owner string) error {
 	for _, service := range appdataDirs {
 		serviceDir := filepath.Join(appdataBase, service)
 
-		if err := d.fs.EnsureDirectory(serviceDir, owner, 0755); err != nil {
+		if err := system.EnsureDirectory(serviceDir, owner, 0755); err != nil {
 			return fmt.Errorf("failed to create appdata directory %s: %w", serviceDir, err)
 		}
 	}
@@ -132,7 +130,7 @@ func (d *DirectorySetup) CreateNFSMountPoints() error {
 	for _, mp := range mountPoints {
 		d.ui.Infof("Creating %s - %s", mp.path, mp.description)
 
-		if err := d.fs.EnsureDirectory(mp.path, "root:root", 0755); err != nil {
+		if err := system.EnsureDirectory(mp.path, "root:root", 0755); err != nil {
 			return fmt.Errorf("failed to create mount point %s: %w", mp.path, err)
 		}
 
@@ -151,7 +149,7 @@ func (d *DirectorySetup) VerifyStructure(containersBase, appdataBase string) err
 	serviceDirs := []string{"media", "web", "cloud"}
 	for _, service := range serviceDirs {
 		serviceDir := filepath.Join(containersBase, service)
-		exists, err := d.fs.DirectoryExists(serviceDir)
+		exists, err := system.DirectoryExists(serviceDir)
 		if err != nil {
 			return fmt.Errorf("failed to check directory %s: %w", serviceDir, err)
 		}
@@ -164,7 +162,7 @@ func (d *DirectorySetup) VerifyStructure(containersBase, appdataBase string) err
 	}
 
 	// Check appdata base directory
-	exists, err := d.fs.DirectoryExists(appdataBase)
+	exists, err := system.DirectoryExists(appdataBase)
 	if err != nil {
 		return fmt.Errorf("failed to check appdata directory: %w", err)
 	}
@@ -234,7 +232,7 @@ func (d *DirectorySetup) VerifyAppdataPermissions(appdataBase, owner string) err
 	testContent := []byte("permission test")
 
 	// Try to write test file
-	if err := d.fs.WriteFile(testFilePath, testContent, 0644); err != nil {
+	if err := system.WriteFile(testFilePath, testContent, 0644); err != nil {
 		return fmt.Errorf("cannot write to appdata directory %s: %w (check owner is %s)", appdataBase, err, owner)
 	}
 

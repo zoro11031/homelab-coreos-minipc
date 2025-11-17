@@ -17,7 +17,6 @@ import (
 // Deployment handles service deployment
 type Deployment struct {
 	containers *system.ContainerManager
-	fs         *system.FileSystem
 	services   *system.ServiceManager
 	config     *config.Config
 	ui         *ui.UI
@@ -39,10 +38,9 @@ type ServiceInfo struct {
 }
 
 // NewDeployment creates a new Deployment instance
-func NewDeployment(containers *system.ContainerManager, fs *system.FileSystem, services *system.ServiceManager, cfg *config.Config, ui *ui.UI, markers *config.Markers) *Deployment {
+func NewDeployment(containers *system.ContainerManager, services *system.ServiceManager, cfg *config.Config, ui *ui.UI, markers *config.Markers) *Deployment {
 	return &Deployment{
 		containers: containers,
-		fs:         fs,
 		services:   services,
 		config:     cfg,
 		ui:         ui,
@@ -146,7 +144,7 @@ WantedBy=multi-user.target
 
 	// Write service file
 	unitPath := filepath.Join("/etc/systemd/system", serviceInfo.UnitName)
-	if err := d.fs.WriteFile(unitPath, []byte(unitContent), 0644); err != nil {
+	if err := system.WriteFile(unitPath, []byte(unitContent), 0644); err != nil {
 		return fmt.Errorf("failed to write service file: %w", err)
 	}
 
@@ -170,8 +168,8 @@ func (d *Deployment) PullImages(serviceInfo *ServiceInfo) error {
 	composeFile := filepath.Join(serviceInfo.Directory, "compose.yml")
 	dockerComposeFile := filepath.Join(serviceInfo.Directory, "docker-compose.yml")
 
-	composeExists, _ := d.fs.FileExists(composeFile)
-	dockerComposeExists, _ := d.fs.FileExists(dockerComposeFile)
+	composeExists, _ := system.FileExists(composeFile)
+	dockerComposeExists, _ := system.FileExists(dockerComposeFile)
 
 	if !composeExists && !dockerComposeExists {
 		return fmt.Errorf("no compose file found in %s", serviceInfo.Directory)

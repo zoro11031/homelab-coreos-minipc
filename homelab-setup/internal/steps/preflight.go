@@ -10,21 +10,19 @@ import (
 
 // PreflightChecker performs system validation checks before setup begins
 type PreflightChecker struct {
-	packages *system.PackageManager
-	network  *system.Network
-	ui       *ui.UI
-	markers  *config.Markers
-	config   *config.Config
+	network *system.Network
+	ui      *ui.UI
+	markers *config.Markers
+	config  *config.Config
 }
 
 // NewPreflightChecker creates a new PreflightChecker instance
-func NewPreflightChecker(packages *system.PackageManager, network *system.Network, ui *ui.UI, markers *config.Markers, cfg *config.Config) *PreflightChecker {
+func NewPreflightChecker(network *system.Network, ui *ui.UI, markers *config.Markers, cfg *config.Config) *PreflightChecker {
 	return &PreflightChecker{
-		packages: packages,
-		network:  network,
-		ui:       ui,
-		markers:  markers,
-		config:   cfg,
+		network: network,
+		ui:      ui,
+		markers: markers,
+		config:  cfg,
 	}
 }
 
@@ -71,7 +69,7 @@ func (p *PreflightChecker) CheckRequiredPackages() error {
 
 	// Check core packages (none currently required)
 	if len(corePackages) > 0 {
-		results, err := p.packages.CheckMultiple(corePackages)
+		results, err := system.CheckMultiplePackages(corePackages)
 		if err != nil {
 			return fmt.Errorf("failed to check packages: %w", err)
 		}
@@ -101,7 +99,7 @@ func (p *PreflightChecker) CheckRequiredPackages() error {
 	// Check optional packages (warnings only)
 	if len(optionalPackages) > 0 {
 		p.ui.Info("Checking optional packages...")
-		results, err := p.packages.CheckMultiple(optionalPackages)
+		results, err := system.CheckMultiplePackages(optionalPackages)
 		if err != nil {
 			p.ui.Warning(fmt.Sprintf("Failed to check optional packages: %v", err))
 		} else {

@@ -6,18 +6,8 @@ import (
 	"strings"
 )
 
-// PackageManager handles package operations on immutable systems
-type PackageManager struct {
-	// No internal state needed - all operations are stateless
-}
-
-// NewPackageManager creates a new PackageManager instance
-func NewPackageManager() *PackageManager {
-	return &PackageManager{}
-}
-
-// IsInstalled checks if a package is installed
-func (pm *PackageManager) IsInstalled(packageName string) (bool, error) {
+// IsPackageInstalled checks if a package is installed
+func IsPackageInstalled(packageName string) (bool, error) {
 	// Use rpm -q to check if package is installed
 	cmd := exec.Command("rpm", "-q", packageName)
 	err := cmd.Run()
@@ -39,13 +29,13 @@ func (pm *PackageManager) IsInstalled(packageName string) (bool, error) {
 	return false, fmt.Errorf("failed to check package %s: %w", packageName, err)
 }
 
-// CheckMultiple checks if multiple packages are installed
+// CheckMultiplePackages checks if multiple packages are installed
 // Returns a map of package name -> installed status
-func (pm *PackageManager) CheckMultiple(packages []string) (map[string]bool, error) {
+func CheckMultiplePackages(packages []string) (map[string]bool, error) {
 	result := make(map[string]bool)
 
 	for _, pkg := range packages {
-		installed, err := pm.IsInstalled(pkg)
+		installed, err := IsPackageInstalled(pkg)
 		if err != nil {
 			return nil, fmt.Errorf("error checking package %s: %w", pkg, err)
 		}
@@ -62,7 +52,7 @@ func CommandExists(command string) bool {
 }
 
 // GetPackageVersion returns the version of an installed package
-func (pm *PackageManager) GetPackageVersion(packageName string) (string, error) {
+func GetPackageVersion(packageName string) (string, error) {
 	cmd := exec.Command("rpm", "-q", "--queryformat", "%{VERSION}-%{RELEASE}", packageName)
 	output, err := cmd.Output()
 	if err != nil {

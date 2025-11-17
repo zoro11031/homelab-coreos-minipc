@@ -33,9 +33,7 @@ type WireGuardPeer struct {
 
 // WireGuardSetup handles WireGuard VPN setup
 type WireGuardSetup struct {
-	packages *system.PackageManager
 	services *system.ServiceManager
-	fs       *system.FileSystem
 	network  *system.Network
 	config   *config.Config
 	ui       *ui.UI
@@ -152,11 +150,9 @@ func sanitizeConfigValue(value string) string {
 }
 
 // NewWireGuardSetup creates a new WireGuardSetup instance
-func NewWireGuardSetup(packages *system.PackageManager, services *system.ServiceManager, fs *system.FileSystem, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers) *WireGuardSetup {
+func NewWireGuardSetup(services *system.ServiceManager, network *system.Network, cfg *config.Config, ui *ui.UI, markers *config.Markers) *WireGuardSetup {
 	return &WireGuardSetup{
-		packages: packages,
 		services: services,
-		fs:       fs,
 		network:  network,
 		config:   cfg,
 		ui:       ui,
@@ -230,7 +226,7 @@ func (w *WireGuardSetup) PromptForWireGuard() (bool, error) {
 func (w *WireGuardSetup) CheckWireGuardInstalled() error {
 	w.ui.Info("Checking for WireGuard tools...")
 
-	installed, err := w.packages.IsInstalled("wireguard-tools")
+	installed, err := system.IsPackageInstalled("wireguard-tools")
 	if err != nil {
 		return fmt.Errorf("failed to check wireguard-tools: %w", err)
 	}
@@ -324,15 +320,15 @@ PrivateKey = %s
 	configDir := w.configDir()
 	configPath := filepath.Join(configDir, fmt.Sprintf("%s.conf", cfg.InterfaceName))
 
-	if err := w.fs.EnsureDirectory(configDir, "root:root", 0750); err != nil {
+	if err := system.EnsureDirectory(configDir, "root:root", 0750); err != nil {
 		return fmt.Errorf("failed to ensure WireGuard directory %s: %w", configDir, err)
 	}
 
-	if err := w.fs.WriteFile(configPath, []byte(configContent), 0600); err != nil {
+	if err := system.WriteFile(configPath, []byte(configContent), 0600); err != nil {
 		return fmt.Errorf("failed to write WireGuard config: %w", err)
 	}
 
-	exists, err := w.fs.FileExists(configPath)
+	exists, err := system.FileExists(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to verify config file: %w", err)
 	}
@@ -340,7 +336,7 @@ PrivateKey = %s
 		return fmt.Errorf("WireGuard config %s was not created", configPath)
 	}
 
-	perms, err := w.fs.GetPermissions(configPath)
+	perms, err := system.GetPermissions(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to check permissions on %s: %w", configPath, err)
 	}
@@ -524,7 +520,7 @@ func (w *WireGuardSetup) AddPeerToConfig(interfaceName string, peer *WireGuardPe
 	newContent := string(output) + peerSection
 
 	// Write updated config
-	if err := w.fs.WriteFile(configPath, []byte(newContent), 0600); err != nil {
+	if err := system.WriteFile(configPath, []byte(newContent), 0600); err != nil {
 		return fmt.Errorf("failed to write config file: %w", err)
 	}
 
