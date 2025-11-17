@@ -536,7 +536,10 @@ func (n *NFSConfigurator) Run() error {
 
 	// Start the mount unit
 	n.ui.Step("Starting Mount Unit")
-	unitName := mountPointToUnitName(mountPoint)
+	unitName, err := pathToUnitName(n.runner, mountPoint)
+	if err != nil {
+		return fmt.Errorf("failed to escape mount point %s: %w", mountPoint, err)
+	}
 	if output, err := n.runner.Run("sudo", "-n", "systemctl", "start", unitName); err != nil {
 		n.ui.Warning(fmt.Sprintf("Failed to start mount unit: %v", err))
 		n.ui.Info("Output: " + output)
