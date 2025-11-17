@@ -274,16 +274,13 @@ func (d *DirectorySetup) Run() error {
 		commonServices := []string{
 			"plex",
 			"jellyfin",
-			"sonarr",
-			"radarr",
-			"lidarr",
-			"prowlarr",
-			"qbittorrent",
 			"overseerr",
+			"wizarr",
 			"nextcloud",
 			"immich",
 			"caddy",
 			"adguard",
+			"nginxproxymanager",
 		}
 
 		d.ui.Info("Select services to create directories for:")
