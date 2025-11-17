@@ -2,6 +2,7 @@ package steps
 
 import (
 	"fmt"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"unicode"
@@ -17,7 +18,6 @@ type NFSConfigurator struct {
 	config  *config.Config
 	ui      *ui.UI
 	markers *config.Markers
-	runner  system.CommandRunner
 }
 
 // NewNFSConfigurator creates a new NFSConfigurator instance
@@ -26,7 +26,6 @@ func NewNFSConfigurator(cfg *config.Config, ui *ui.UI, markers *config.Markers) 
 		config:  cfg,
 		ui:      ui,
 		markers: markers,
-		runner:  system.NewCommandRunner(),
 	}
 }
 
@@ -363,14 +362,16 @@ WantedBy=multi-user.target
 	n.ui.Successf("Created automount unit: %s", automountUnitPath)
 
 	// Reload systemd to recognize the new units.
-	if output, err := n.runner.Run("sudo", "-n", "systemctl", "daemon-reload"); err != nil {
-		return fmt.Errorf("failed to reload systemd: %w\nOutput: %s", err, output)
+	cmd := exec.Command("sudo", "-n", "systemctl", "daemon-reload")
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to reload systemd: %w\nOutput: %s", err, string(output))
 	}
 	n.ui.Success("systemd reloaded")
 
 	// Enable and start the automount unit.
-	if output, err := n.runner.Run("sudo", "-n", "systemctl", "enable", "--now", automountUnitName); err != nil {
-		return fmt.Errorf("failed to enable and start automount unit: %w\nOutput: %s", err, output)
+	cmd = exec.Command("sudo", "-n", "systemctl", "enable", "--now", automountUnitName)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("failed to enable and start automount unit: %w\nOutput: %s", err, string(output))
 	}
 
 	n.ui.Successf("Enabled and started automount unit: %s", automountUnitName)
