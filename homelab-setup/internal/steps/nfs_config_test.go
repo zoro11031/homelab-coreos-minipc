@@ -32,7 +32,7 @@ func TestAddToFstabAppendsEntryAndReloads(t *testing.T) {
 	testUI := ui.NewWithWriter(buf)
 
 	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers)
-	fakeRunner := &fakeCommandRunner{}
+	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{}}
 	nfs.runner = fakeRunner
 
 	if err := nfs.AddToFstab("192.168.1.10", "/export", "/mnt/data"); err != nil {
@@ -64,7 +64,9 @@ func TestMountNFSUsesRunner(t *testing.T) {
 	testUI := ui.NewWithWriter(buf)
 
 	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers)
-	fakeRunner := &fakeCommandRunner{}
+	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{
+		"systemd-escape --path --suffix=mount /mnt/nas-media": "mnt-nas\\x2dmedia.mount\n",
+	}}
 	nfs.runner = fakeRunner
 
 	mountPoint := filepath.Join(tmpDir, "mnt")
@@ -101,8 +103,9 @@ func TestMountNFSFailureReturnsError(t *testing.T) {
 }
 
 type fakeCommandRunner struct {
-	commands    []string
-	failCommand string
+	commands       []string
+	failCommand    string
+	commandOutputs map[string]string
 }
 
 func (f *fakeCommandRunner) Run(name string, args ...string) (string, error) {
@@ -110,6 +113,9 @@ func (f *fakeCommandRunner) Run(name string, args ...string) (string, error) {
 	f.commands = append(f.commands, cmd)
 	if f.failCommand != "" && cmd == f.failCommand {
 		return "", fmt.Errorf("forced failure for %s", cmd)
+	}
+	if output, ok := f.commandOutputs[cmd]; ok {
+		return output, nil
 	}
 	return "", nil
 }
@@ -138,7 +144,9 @@ func TestCreateSystemdMountUnit(t *testing.T) {
 	testUI := ui.NewWithWriter(buf)
 
 	nfs := NewNFSConfigurator(fs, network, cfg, testUI, markers)
-	fakeRunner := &fakeCommandRunner{}
+	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{
+		"systemd-escape --path --suffix=mount /mnt/nas-media": "mnt-nas\\x2dmedia.mount\n",
+	}}
 	nfs.runner = fakeRunner
 
 	// Test creating mount unit - this will fail due to permissions
@@ -165,14 +173,26 @@ func TestPathToUnitName(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"/mnt/nas-media", "mnt-nas-media.mount"},
-		{"/mnt/nas-nextcloud", "mnt-nas-nextcloud.mount"},
+		{"/mnt/nas-media", "mnt-nas\\x2dmedia.mount"},
+		{"/mnt/nas-nextcloud", "mnt-nas\\x2dnextcloud.mount"},
 		{"/srv/data", "srv-data.mount"},
 		{"/mnt/foo/bar/baz", "mnt-foo-bar-baz.mount"},
+		{"/mnt/My Media", "mnt-My\\x20Media.mount"},
 	}
 
+	fakeRunner := &fakeCommandRunner{commandOutputs: map[string]string{
+		"systemd-escape --path --suffix=mount /mnt/nas-media":     "mnt-nas\\x2dmedia.mount\n",
+		"systemd-escape --path --suffix=mount /mnt/nas-nextcloud": "mnt-nas\\x2dnextcloud.mount\n",
+		"systemd-escape --path --suffix=mount /srv/data":          "srv-data.mount\n",
+		"systemd-escape --path --suffix=mount /mnt/foo/bar/baz":   "mnt-foo-bar-baz.mount\n",
+		"systemd-escape --path --suffix=mount /mnt/My Media":      "mnt-My\\x20Media.mount\n",
+	}}
+
 	for _, tt := range tests {
-		result := pathToUnitName(tt.input)
+		result, err := pathToUnitName(fakeRunner, tt.input)
+		if err != nil {
+			t.Fatalf("pathToUnitName(%q) returned error: %v", tt.input, err)
+		}
 		if result != tt.expected {
 			t.Errorf("pathToUnitName(%q) = %q, want %q", tt.input, result, tt.expected)
 		}
