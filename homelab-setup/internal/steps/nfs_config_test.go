@@ -203,3 +203,91 @@ func TestPathToUnitName(t *testing.T) {
 		}
 	}
 }
+
+func TestMountPointToUnitName(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "simple path with single directory",
+			input:    "/mnt/data",
+			expected: "mnt-data.mount",
+		},
+		{
+			name:     "nested path with multiple directories",
+			input:    "/mnt/foo/bar/baz",
+			expected: "mnt-foo-bar-baz.mount",
+		},
+		{
+			name:     "path with hyphen in name",
+			input:    "/mnt/nas-media",
+			expected: "mnt-nas-media.mount",
+		},
+		{
+			name:     "path with multiple hyphens",
+			input:    "/mnt/nas-nextcloud",
+			expected: "mnt-nas-nextcloud.mount",
+		},
+		{
+			name:     "path with srv directory",
+			input:    "/srv/data",
+			expected: "srv-data.mount",
+		},
+		{
+			name:     "deeply nested path",
+			input:    "/mnt/storage/media/videos",
+			expected: "mnt-storage-media-videos.mount",
+		},
+		{
+			name:     "path with single letter components",
+			input:    "/a/b/c",
+			expected: "a-b-c.mount",
+		},
+		{
+			name:     "path with numbers",
+			input:    "/mnt/disk1",
+			expected: "mnt-disk1.mount",
+		},
+		{
+			name:     "path without leading slash",
+			input:    "mnt/data",
+			expected: "mnt-data.mount",
+		},
+		{
+			name:     "path with spaces (not recommended but should work)",
+			input:    "/mnt/My Media",
+			expected: "mnt-My Media.mount",
+		},
+		{
+			name:     "path with underscores",
+			input:    "/mnt/nas_storage",
+			expected: "mnt-nas_storage.mount",
+		},
+		{
+			name:     "path with dots",
+			input:    "/mnt/media.backup",
+			expected: "mnt-media.backup.mount",
+		},
+		{
+			name:     "root path",
+			input:    "/",
+			expected: ".mount",
+		},
+		{
+			name:     "empty string",
+			input:    "",
+			expected: ".mount",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := mountPointToUnitName(tt.input)
+			if result != tt.expected {
+				t.Errorf("mountPointToUnitName(%q) = %q, want %q", tt.input, result, tt.expected)
+			}
+		})
+	}
+}
