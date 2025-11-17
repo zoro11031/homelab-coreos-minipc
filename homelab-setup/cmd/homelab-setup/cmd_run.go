@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"path/filepath"
 
 	"github.com/spf13/cobra"
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/cli"
@@ -10,12 +9,12 @@ import (
 
 var (
 	// Flags for non-interactive mode
-	nonInteractive bool
-	dryRun         bool
-	setupUser      string
-	nfsServer      string
-	homelabBaseDir string
-	skipWireguard  bool
+	nonInteractive   bool
+	dryRun           bool
+	setupUser        string
+	nfsServer        string
+	containersBase   string
+	skipWireguard    bool
 )
 
 var runCmd = &cobra.Command{
@@ -42,7 +41,7 @@ func init() {
 	runCmd.Flags().BoolVar(&dryRun, "dry-run", false, "Preview actions without executing")
 	runCmd.Flags().StringVar(&setupUser, "setup-user", "", "Username for homelab setup")
 	runCmd.Flags().StringVar(&nfsServer, "nfs-server", "", "NFS server address")
-	runCmd.Flags().StringVar(&homelabBaseDir, "homelab-base-dir", "", "Base directory for homelab")
+	runCmd.Flags().StringVar(&containersBase, "containers-base", "", "Base directory for container services (default: /srv/containers)")
 	runCmd.Flags().BoolVar(&skipWireguard, "skip-wireguard", false, "Skip WireGuard setup")
 
 	rootCmd.AddCommand(runCmd)
@@ -90,19 +89,17 @@ func applyNonInteractiveConfig(ctx *cli.SetupContext) error {
 		}
 	}
 
-	if homelabBaseDir != "" {
-		if err := ctx.Config.Set("HOMELAB_BASE_DIR", homelabBaseDir); err != nil {
-			return fmt.Errorf("failed to set HOMELAB_BASE_DIR: %w", err)
-		}
-		if err := ctx.Config.Set("CONTAINERS_BASE", homelabBaseDir); err != nil {
+	if containersBase != "" {
+		if err := ctx.Config.Set("CONTAINERS_BASE", containersBase); err != nil {
 			return fmt.Errorf("failed to set CONTAINERS_BASE: %w", err)
 		}
-		appdataPath := filepath.Join(homelabBaseDir, "appdata")
-		// Use APPDATA_BASE as per architecture document (go-rewrite-plan.md)
+		// Appdata is always at /var/lib/containers/appdata per documentation
+		appdataPath := "/var/lib/containers/appdata"
+		// Use APPDATA_BASE as per architecture document
 		if err := ctx.Config.Set("APPDATA_BASE", appdataPath); err != nil {
 			return fmt.Errorf("failed to set APPDATA_BASE: %w", err)
 		}
-		// Also set APPDATA_PATH for backwards compatibility with legacy configs
+		// Also set APPDATA_PATH for backwards compatibility with .env files
 		if err := ctx.Config.Set("APPDATA_PATH", appdataPath); err != nil {
 			return fmt.Errorf("failed to set APPDATA_PATH: %w", err)
 		}

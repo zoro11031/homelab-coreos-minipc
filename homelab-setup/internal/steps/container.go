@@ -422,6 +422,24 @@ func (c *ContainerSetup) configureCloudEnv() error {
 	c.ui.Info("Nextcloud Setup:")
 	c.ui.Print("")
 
+	// Admin credentials for initial setup
+	nextcloudAdminUser, err := c.ui.PromptInput("Nextcloud admin username", "admin")
+	if err != nil {
+		return err
+	}
+	if err := c.config.Set("NEXTCLOUD_ADMIN_USER", nextcloudAdminUser); err != nil {
+		return fmt.Errorf("failed to save NEXTCLOUD_ADMIN_USER: %w", err)
+	}
+
+	nextcloudAdminPass, err := c.ui.PromptPasswordConfirm("Nextcloud admin password")
+	if err != nil {
+		return err
+	}
+	if err := c.config.Set("NEXTCLOUD_ADMIN_PASSWORD", nextcloudAdminPass); err != nil {
+		return fmt.Errorf("failed to save NEXTCLOUD_ADMIN_PASSWORD: %w", err)
+	}
+
+	// Database credentials
 	nextcloudDBUser, err := c.ui.PromptInput("Nextcloud database username", "nc_user")
 	if err != nil {
 		return err
@@ -474,25 +492,36 @@ func (c *ContainerSetup) configureCloudEnv() error {
 		return fmt.Errorf("failed to save NEXTCLOUD_PHP_UPLOAD_LIMIT: %w", err)
 	}
 
-	// Collabora configuration
+	// Collabora configuration (truly optional)
 	c.ui.Print("")
-	c.ui.Info("Collabora Setup (optional - press Enter to skip):")
-	c.ui.Print("")
-
-	collaboraUser, err := c.ui.PromptInput("Collabora username (optional)", "admin")
+	setupCollabora, err := c.ui.PromptYesNo("Configure Collabora Online (office document editing)?", false)
 	if err != nil {
 		return err
 	}
-	if err := c.config.Set("COLLABORA_USERNAME", collaboraUser); err != nil {
-		return fmt.Errorf("failed to save COLLABORA_USERNAME: %w", err)
-	}
 
-	collaboraPass, err := c.ui.PromptPassword("Collabora admin password (optional)")
-	if err != nil {
-		return err
-	}
-	if err := c.config.Set("COLLABORA_PASSWORD", collaboraPass); err != nil {
-		return fmt.Errorf("failed to save COLLABORA_PASSWORD: %w", err)
+	if setupCollabora {
+		c.ui.Info("Collabora Setup:")
+		c.ui.Print("")
+
+		collaboraUser, err := c.ui.PromptInput("Collabora username", "admin")
+		if err != nil {
+			return err
+		}
+		if err := c.config.Set("COLLABORA_USERNAME", collaboraUser); err != nil {
+			return fmt.Errorf("failed to save COLLABORA_USERNAME: %w", err)
+		}
+
+		collaboraPass, err := c.ui.PromptPassword("Collabora admin password")
+		if err != nil {
+			return err
+		}
+		if err := c.config.Set("COLLABORA_PASSWORD", collaboraPass); err != nil {
+			return fmt.Errorf("failed to save COLLABORA_PASSWORD: %w", err)
+		}
+	} else {
+		// Set empty values for optional Collabora fields
+		c.config.Set("COLLABORA_USERNAME", "admin")
+		c.config.Set("COLLABORA_PASSWORD", "")
 	}
 
 	// Escape domain for Collabora (dots need to be escaped)
@@ -598,9 +627,8 @@ JELLYFIN_PUBLIC_URL=%s
 # Intel QuickSync device for hardware transcoding
 TRANSCODE_DEVICE=/dev/dri
 
-# Media Paths (configured during NFS setup)
-# These paths should match your NFS mount points
-# /mnt/nas-media - Main media library
+# Note: Media paths are configured in the compose file
+# Ensure NFS mounts are set up at /mnt/nas-media before starting services
 
 `, c.config.GetOrDefault("PLEX_CLAIM_TOKEN", ""),
 			c.config.GetOrDefault("JELLYFIN_PUBLIC_URL", ""))
@@ -616,12 +644,16 @@ ORGANIZR_PORT=9983
 HOMEPAGE_PORT=3000
 
 # Note: These services are typically accessed via reverse proxy
-# Configure your VPS Nginx Proxy Manager to route to these ports
+# Configure your reverse proxy to route to these ports via WireGuard tunnel
 
 `, c.config.GetOrDefault("OVERSEERR_API_KEY", ""))
 
 	case "cloud":
-		content += fmt.Sprintf(`# Nextcloud Database Configuration
+		content += fmt.Sprintf(`# Nextcloud Admin Credentials (for initial setup)
+NEXTCLOUD_ADMIN_USER=%s
+NEXTCLOUD_ADMIN_PASSWORD=%s
+
+# Nextcloud Database Configuration
 NEXTCLOUD_DB_USERNAME=%s
 NEXTCLOUD_DB_PASSWORD=%s
 NEXTCLOUD_DB_DATABASE=%s
@@ -644,7 +676,9 @@ IMMICH_DB_USERNAME=%s
 IMMICH_DB_PASSWORD=%s
 IMMICH_DB_DATABASE=%s
 
-`, c.config.GetOrDefault("NEXTCLOUD_DB_USERNAME", "nc_user"),
+`, c.config.GetOrDefault("NEXTCLOUD_ADMIN_USER", "admin"),
+			c.config.GetOrDefault("NEXTCLOUD_ADMIN_PASSWORD", ""),
+			c.config.GetOrDefault("NEXTCLOUD_DB_USERNAME", "nc_user"),
 			c.config.GetOrDefault("NEXTCLOUD_DB_PASSWORD", ""),
 			c.config.GetOrDefault("NEXTCLOUD_DB_DATABASE", "nextcloud"),
 			c.config.GetOrDefault("NEXTCLOUD_TRUSTED_DOMAINS", "localhost"),

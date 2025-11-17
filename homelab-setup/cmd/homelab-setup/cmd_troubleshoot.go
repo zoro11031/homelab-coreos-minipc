@@ -138,7 +138,7 @@ func checkConfiguration(ctx *cli.SetupContext) {
 		// Show key configurations
 		ctx.UI.Print("")
 		ctx.UI.Info("Key configurations:")
-		keyConfigs := []string{"SETUP_USER", "ENV_PUID", "ENV_PGID", "ENV_TZ", "NFS_SERVER", "HOMELAB_BASE_DIR"}
+		keyConfigs := []string{"SETUP_USER", "ENV_PUID", "ENV_PGID", "ENV_TZ", "NFS_SERVER", "CONTAINERS_BASE", "APPDATA_BASE"}
 		for _, key := range keyConfigs {
 			if value := ctx.Config.GetOrDefault(key, ""); value != "" {
 				ctx.UI.Infof("  %s=%s", key, value)
