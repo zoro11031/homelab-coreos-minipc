@@ -27,6 +27,7 @@ const (
 	KeyContainerRuntime   = "CONTAINER_RUNTIME"
 	KeySelectedServices   = "SELECTED_SERVICES"
 	KeyComposeProjectName = "COMPOSE_PROJECT_NAME"
+	KeyComposeCommand     = "COMPOSE_COMMAND" // Resolved compose command (e.g., "docker compose" or "docker-compose")
 
 	// Network configuration
 	KeyNetworkTestRetries = "NETWORK_TEST_RETRIES"
