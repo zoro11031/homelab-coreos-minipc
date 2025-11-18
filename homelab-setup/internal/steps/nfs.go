@@ -319,6 +319,7 @@ func getNFSMountOptions(cfg *config.Config) string {
 			continue
 		}
 
+		// New option not in defaults - append it
 		optionPositions[key] = len(merged)
 		merged = append(merged, opt)
 	}
@@ -372,23 +373,28 @@ func createFstabEntry(cfg *config.Config, ui *ui.UI, host, export, mountPoint st
 		}
 
 		// Check if mount point is already used (even with different options)
-		if strings.Contains(trimmed, " "+mountPoint+" ") && !strings.HasPrefix(trimmed, "#") {
-			ui.Warning(fmt.Sprintf("Mount point %s already exists in fstab with different options", mountPoint))
-			ui.Infof("Existing entry: %s", trimmed)
-			ui.Infof("New entry:      %s", fstabEntry)
+		// Parse fields properly: device mountpoint fstype options dump pass
+		if !strings.HasPrefix(trimmed, "#") && trimmed != "" {
+			fields := strings.Fields(trimmed)
+			// Valid fstab line has at least 2 fields (device and mount point)
+			if len(fields) >= 2 && fields[1] == mountPoint {
+				ui.Warning(fmt.Sprintf("Mount point %s already exists in fstab with different options", mountPoint))
+				ui.Infof("Existing entry: %s", trimmed)
+				ui.Infof("New entry:      %s", fstabEntry)
 
-			continueAnyway, err := ui.PromptYesNo("Replace existing entry?", false)
-			if err != nil {
-				return fmt.Errorf("failed to prompt: %w", err)
-			}
-			if !continueAnyway {
-				return fmt.Errorf("fstab entry creation cancelled")
-			}
+				continueAnyway, err := ui.PromptYesNo("Replace existing entry?", false)
+				if err != nil {
+					return fmt.Errorf("failed to prompt: %w", err)
+				}
+				if !continueAnyway {
+					return fmt.Errorf("fstab entry creation cancelled")
+				}
 
-			// Comment out the old entry and mark for replacement
-			updatedLines = append(updatedLines, "# "+trimmed+" # Replaced by homelab-setup")
-			replacedEntry = true
-			continue
+				// Comment out the old entry and mark for replacement
+				updatedLines = append(updatedLines, "# "+trimmed+" # Replaced by homelab-setup")
+				replacedEntry = true
+				continue
+			}
 		}
 
 		// Keep all other lines as-is

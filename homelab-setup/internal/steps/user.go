@@ -154,9 +154,17 @@ func createUserIfNeeded(cfg *config.Config, username string, ui *ui.UI) error {
 		ui.Successf("System service account %s created successfully", username)
 
 		// Get and display the assigned UID/GID
-		uid, _ := system.GetUID(username)
-		gid, _ := system.GetGID(username)
-		ui.Infof("Assigned UID=%d, GID=%d", uid, gid)
+		uid, err := system.GetUID(username)
+		if err != nil {
+			ui.Warning(fmt.Sprintf("Could not retrieve UID for %s: %v", username, err))
+		} else {
+			gid, err := system.GetGID(username)
+			if err != nil {
+				ui.Warning(fmt.Sprintf("Could not retrieve GID for %s: %v", username, err))
+			} else {
+				ui.Infof("Assigned UID=%d, GID=%d", uid, gid)
+			}
+		}
 		ui.Info("This account uses /sbin/nologin (no interactive login)")
 
 	} else {

@@ -220,9 +220,13 @@ func TestFstabDuplicateDetection(t *testing.T) {
 			foundMount := false
 			for _, line := range tt.existingLines {
 				trimmed := strings.TrimSpace(line)
-				if strings.Contains(trimmed, " "+mountPoint+" ") && !strings.HasPrefix(trimmed, "#") {
-					foundMount = true
-					break
+				if !strings.HasPrefix(trimmed, "#") && trimmed != "" {
+					fields := strings.Fields(trimmed)
+					// Valid fstab line has at least 2 fields (device and mount point)
+					if len(fields) >= 2 && fields[1] == mountPoint {
+						foundMount = true
+						break
+					}
 				}
 			}
 

@@ -63,10 +63,15 @@ func TestFstabReplacement(t *testing.T) {
 				}
 
 				// Check if mount point is already used (even with different options)
-				if strings.Contains(trimmed, " "+tt.mountPoint+" ") && !strings.HasPrefix(trimmed, "#") {
-					// Comment out the old entry
-					updatedLines = append(updatedLines, "# "+trimmed+" # Replaced by homelab-setup")
-					continue
+				// Parse fields properly: device mountpoint fstype options dump pass
+				if !strings.HasPrefix(trimmed, "#") && trimmed != "" {
+					fields := strings.Fields(trimmed)
+					// Valid fstab line has at least 2 fields (device and mount point)
+					if len(fields) >= 2 && fields[1] == tt.mountPoint {
+						// Comment out the old entry
+						updatedLines = append(updatedLines, "# "+trimmed+" # Replaced by homelab-setup")
+						continue
+					}
 				}
 
 				// Keep all other lines as-is
@@ -115,8 +120,12 @@ func TestFstabReplacement(t *testing.T) {
 			activeEntries := 0
 			for _, line := range lines {
 				trimmed := strings.TrimSpace(line)
-				if strings.Contains(trimmed, " "+tt.mountPoint+" ") && !strings.HasPrefix(trimmed, "#") {
-					activeEntries++
+				if !strings.HasPrefix(trimmed, "#") && trimmed != "" {
+					fields := strings.Fields(trimmed)
+					// Valid fstab line has at least 2 fields (device and mount point)
+					if len(fields) >= 2 && fields[1] == tt.mountPoint {
+						activeEntries++
+					}
 				}
 			}
 			if activeEntries != 1 {

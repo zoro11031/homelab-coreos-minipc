@@ -142,6 +142,19 @@ func detectComposeCommand(cfg *config.Config, runtime system.ContainerRuntime) (
 	return composeCmd, nil
 }
 
+// formatComposeCommandForSystemd formats a compose command for use in systemd Exec directives
+// Multi-word commands like "docker compose" are formatted with absolute path
+// Single commands like "docker-compose" are returned as-is
+func formatComposeCommandForSystemd(composeCmd string) string {
+	cmdParts := strings.Fields(composeCmd)
+	if len(cmdParts) == 2 {
+		// Multi-word command like "docker compose" - use absolute path for first part
+		return fmt.Sprintf("/usr/bin/%s %s", cmdParts[0], cmdParts[1])
+	}
+	// Single command like "docker-compose" - use as-is
+	return composeCmd
+}
+
 // createComposeService creates a systemd service for docker-compose/podman-compose
 // For Docker runtime, creates system-level units that depend on docker.service and NFS mounts
 // For Podman runtime, maintains rootless behavior with User= directive
@@ -192,16 +205,22 @@ func createComposeService(cfg *config.Config, ui *ui.UI, serviceInfo *ServiceInf
 		unitAfter = append(unitAfter, "network-online.target")
 	}
 
-	// Build [Unit] section
+	// Build [Unit] section with optional Requires= directive
+	var requiresDirective string
+	if len(unitRequires) > 0 {
+		requiresDirective = fmt.Sprintf("Requires=%s\n", strings.Join(unitRequires, " "))
+	}
+
 	unitSection := fmt.Sprintf(`[Unit]
 Description=Homelab %s Stack
 Wants=%s
 After=%s
-%sRequiresMountsFor=%s
+%s%sRequiresMountsFor=%s
 
 `, serviceInfo.DisplayName,
 		strings.Join(unitWants, " "),
 		strings.Join(unitAfter, " "),
+		requiresDirective,
 		mountDependencies,
 		serviceInfo.Directory)
 
@@ -209,13 +228,16 @@ After=%s
 	var serviceSection string
 	if runtime == system.RuntimeDocker {
 		// Docker: system-level service (no User= directive)
+		// Format compose command for systemd Exec directives
+		execComposeCmd := formatComposeCommandForSystemd(composeCmd)
+
 		// Add ExecStartPre to verify NFS mount if configured
 		var preExecChecks string
 		nfsMountPoint := cfg.GetOrDefault(config.KeyNFSMountPoint, "")
 		if nfsMountPoint != "" {
 			preExecChecks = fmt.Sprintf("ExecStartPre=/usr/bin/findmnt %s\n", nfsMountPoint)
 		}
-		preExecChecks += fmt.Sprintf("ExecStartPre=%s pull --quiet\n", composeCmd)
+		preExecChecks += fmt.Sprintf("ExecStartPre=%s pull --quiet\n", execComposeCmd)
 
 		serviceSection = fmt.Sprintf(`[Service]
 Type=oneshot
@@ -228,7 +250,7 @@ RestartSec=10
 TimeoutStartSec=600
 TimeoutStopSec=120
 
-`, serviceInfo.Directory, preExecChecks, composeCmd, composeCmd)
+`, serviceInfo.Directory, preExecChecks, execComposeCmd, execComposeCmd)
 	} else {
 		// Podman: rootless service with User= directive (legacy)
 		serviceUser, err := getServiceUser(cfg)
@@ -244,7 +266,7 @@ TimeoutStopSec=120
 		if !lingerEnabled {
 			ui.Infof("Enabling lingering for %s so /run/user is available for rootless compose", serviceUser)
 			if err := system.EnableLinger(serviceUser); err != nil {
-				return err
+				return fmt.Errorf("failed to enable lingering for %s: %w", serviceUser, err)
 			}
 			ui.Successf("Enabled lingering for %s", serviceUser)
 		}
@@ -253,6 +275,9 @@ TimeoutStopSec=120
 		if err != nil {
 			return fmt.Errorf("failed to prepare runtime directory for %s: %w", serviceUser, err)
 		}
+
+		// Format compose command for systemd Exec directives
+		execComposeCmd := formatComposeCommandForSystemd(composeCmd)
 
 		serviceSection = fmt.Sprintf(`[Service]
 User=%s
@@ -266,7 +291,7 @@ ExecStart=%s up -d
 ExecStop=%s down
 TimeoutStartSec=600
 
-`, serviceUser, serviceUser, runtimeDir, serviceInfo.Directory, composeCmd, composeCmd, composeCmd)
+`, serviceUser, serviceUser, runtimeDir, serviceInfo.Directory, execComposeCmd, execComposeCmd, execComposeCmd)
 	}
 
 	// Build complete unit content
@@ -466,9 +491,12 @@ func displayAccessInfo(cfg *config.Config, ui *ui.UI) {
 		}
 	}
 
+	// Get runtime for displaying correct commands
+	runtimeStr := cfg.GetOrDefault(config.KeyContainerRuntime, "docker")
+
 	ui.Info("Note: Services may take a few minutes to fully start")
-	ui.Info("Check container logs with: podman logs <container-name>")
-	ui.Info("Or use: podman ps to see running containers")
+	ui.Infof("Check container logs with: %s logs <container-name>", runtimeStr)
+	ui.Infof("Or use: %s ps to see running containers", runtimeStr)
 	ui.Print("")
 }
 
