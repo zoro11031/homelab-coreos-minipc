@@ -293,11 +293,48 @@ func mountPointToUnitBaseName(mountPoint string) string {
 
 // getNFSMountOptions returns the NFS mount options from config or a default
 func getNFSMountOptions(cfg *config.Config) string {
-	options := cfg.GetOrDefault(config.KeyNFSMountOptions, "")
-	if options == "" {
-		return "defaults,_netdev"
+	// Base options enforce safe boot behavior and network readiness
+	baseOptions := []string{"defaults", "nfsvers=4.2", "_netdev", "nofail"}
+
+	// Track option keys so user-provided values can override defaults
+	optionPositions := make(map[string]int)
+	merged := make([]string, len(baseOptions))
+	copy(merged, baseOptions)
+
+	for i, opt := range merged {
+		optionPositions[optionKey(opt)] = i
 	}
-	return options
+
+	rawOptions := cfg.GetOrDefault(config.KeyNFSMountOptions, "")
+	for _, raw := range strings.Split(rawOptions, ",") {
+		opt := strings.TrimSpace(raw)
+		if opt == "" {
+			continue
+		}
+
+		key := optionKey(opt)
+		if idx, exists := optionPositions[key]; exists {
+			// Override the default value while retaining ordering
+			merged[idx] = opt
+			continue
+		}
+
+		optionPositions[key] = len(merged)
+		merged = append(merged, opt)
+	}
+
+	return strings.Join(merged, ",")
+}
+
+// optionKey normalizes an option name for override checks (e.g., nfsvers=4.2 -> nfsvers)
+func optionKey(option string) string {
+	if option == "" {
+		return ""
+	}
+
+	// Split once to keep the base key (everything before '=')
+	parts := strings.SplitN(option, "=", 2)
+	return strings.TrimSpace(parts[0])
 }
 
 // createFstabEntry adds an NFS mount entry to /etc/fstab with validation
@@ -305,11 +342,12 @@ func createFstabEntry(cfg *config.Config, ui *ui.UI, host, export, mountPoint st
 	ui.Info("Adding NFS mount to /etc/fstab...")
 
 	// Build fstab entry with resilient options
-	// nfsvers=4.2 - Use NFSv4.2 for best performance
+	// nfsvers=4.2 - Use NFSv4.2 for best performance (overridable via config)
 	// _netdev - Mount only after network is available
 	// nofail - Don't block boot if mount fails
 	// defaults - Use default mount options
-	fstabEntry := fmt.Sprintf("%s:%s %s nfs defaults,nfsvers=4.2,_netdev,nofail 0 0", host, export, mountPoint)
+	mountOptions := getNFSMountOptions(cfg)
+	fstabEntry := fmt.Sprintf("%s:%s %s nfs %s 0 0", host, export, mountPoint, mountOptions)
 
 	// Read current fstab
 	fstabPath := "/etc/fstab"

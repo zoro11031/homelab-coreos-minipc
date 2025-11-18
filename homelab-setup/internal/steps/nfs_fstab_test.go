@@ -1,12 +1,18 @@
 package steps
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
 )
 
 // TestFstabReplacement tests the fstab entry replacement logic
 func TestFstabReplacement(t *testing.T) {
+	cfg := config.New(filepath.Join(t.TempDir(), "config"))
+	options := getNFSMountOptions(cfg)
+
 	tests := []struct {
 		name          string
 		existingFstab string
@@ -22,7 +28,7 @@ func TestFstabReplacement(t *testing.T) {
 /dev/sda1 / ext4 defaults 0 1
 192.168.1.10:/volume1/media /mnt/nas nfs defaults 0 0
 `,
-			newEntry:      "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
+			newEntry:      "192.168.1.10:/volume1/media /mnt/nas nfs " + options + " 0 0",
 			mountPoint:    "/mnt/nas",
 			wantCommented: true,
 			wantNewEntry:  true,
@@ -33,7 +39,7 @@ func TestFstabReplacement(t *testing.T) {
 			existingFstab: `# /etc/fstab
 /dev/sda1 / ext4 defaults 0 1
 `,
-			newEntry:      "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
+			newEntry:      "192.168.1.10:/volume1/media /mnt/nas nfs " + options + " 0 0",
 			mountPoint:    "/mnt/nas",
 			wantCommented: false,
 			wantNewEntry:  true,
