@@ -327,7 +327,6 @@ func createSystemdUnits(cfg *config.Config, ui *ui.UI, host, export, mountPoint 
 	mountContent := fmt.Sprintf(`[Unit]
 Description=NFS mount for %s
 After=network-online.target
-Requires=network-online.target
 
 [Mount]
 What=%s:%s
@@ -335,6 +334,9 @@ Where=%s
 Type=nfs
 Options=%s
 TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target
 `, mountPoint, host, export, mountPoint, mountOptions)
 
 	// Generate automount unit content.
