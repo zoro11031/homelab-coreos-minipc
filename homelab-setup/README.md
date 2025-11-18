@@ -64,6 +64,13 @@ homelab-setup status
 homelab-setup troubleshoot
 ```
 
+### Service User and Permissions
+
+- The **User Setup** step records the homelab account in `HOMELAB_USER`.
+- Container stack setup uses the same account to own compose files and `.env` secrets.
+- Generated systemd units for docker/podman compose run as this user so rootless services can read the files they manage.
+- If you need to change the service user, re-run the User Setup step before rebuilding container stacks and services.
+
 ## Requirements
 
 ### System Requirements

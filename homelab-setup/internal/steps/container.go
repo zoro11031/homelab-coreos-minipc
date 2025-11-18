@@ -552,7 +552,10 @@ func configureCloudEnv(cfg *config.Config, ui *ui.UI) error {
 func createEnvFiles(cfg *config.Config, ui *ui.UI, selectedStacks []string) error {
 	ui.Step("Creating Environment Files")
 
-	setupUser := cfg.GetOrDefault("HOMELAB_USER", "")
+	serviceUser, err := getServiceUser(cfg)
+	if err != nil {
+		return err
+	}
 
 	for _, serviceName := range selectedStacks {
 		envPath := filepath.Join(serviceDirectory(cfg, serviceName), ".env")
@@ -566,7 +569,7 @@ func createEnvFiles(cfg *config.Config, ui *ui.UI, selectedStacks []string) erro
 		}
 
 		// Set ownership
-		if err := system.Chown(envPath, fmt.Sprintf("%s:%s", setupUser, setupUser)); err != nil {
+		if err := system.Chown(envPath, fmt.Sprintf("%s:%s", serviceUser, serviceUser)); err != nil {
 			return fmt.Errorf("failed to set ownership on %s: %w", envPath, err)
 		}
 

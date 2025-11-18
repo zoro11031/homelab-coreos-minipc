@@ -89,6 +89,11 @@ func getRuntimeFromConfig(cfg *config.Config) (system.ContainerRuntime, error) {
 func createComposeService(cfg *config.Config, ui *ui.UI, serviceInfo *ServiceInfo) error {
 	ui.Infof("Creating systemd service: %s", serviceInfo.UnitName)
 
+	serviceUser, err := getServiceUser(cfg)
+	if err != nil {
+		return err
+	}
+
 	// Get container runtime using helper
 	runtime, err := getRuntimeFromConfig(cfg)
 	if err != nil {
@@ -110,6 +115,8 @@ After=network-online.target
 RequiresMountsFor=%s
 
 [Service]
+User=%s
+Group=%s
 Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=%s
@@ -121,6 +128,7 @@ TimeoutStartSec=600
 [Install]
 WantedBy=multi-user.target
 `, serviceInfo.DisplayName, serviceInfo.Directory,
+		serviceUser, serviceUser,
 		serviceInfo.Directory,
 		composeCmd, composeCmd, composeCmd)
 
