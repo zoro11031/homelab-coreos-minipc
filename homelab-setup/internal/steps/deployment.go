@@ -117,6 +117,7 @@ RequiresMountsFor=%s
 [Service]
 User=%s
 Group=%s
+Environment="XDG_RUNTIME_DIR=/run/user/%%U"
 Type=oneshot
 RemainAfterExit=true
 WorkingDirectory=%s
