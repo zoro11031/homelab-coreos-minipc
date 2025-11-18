@@ -98,10 +98,11 @@ func promptForNFSDetails(cfg *config.Config, ui *ui.UI) (host, export, mountPoin
 	}
 	if !isValidIP {
 		// Not an IP, validate as hostname/domain
-		if host == "" || len(host) > 253 || !strings.Contains(host, ".") {
+		// Allow single-label hostnames (e.g., 'nas', 'truenas') for mDNS/NetBIOS names
+		if host == "" || len(host) > 253 {
 			return "", "", "", fmt.Errorf("invalid NFS server (not a valid IP or hostname): %s", host)
 		}
-		// Basic hostname validation
+		// Basic hostname validation - check each label
 		parts := strings.Split(host, ".")
 		for _, part := range parts {
 			if part == "" || len(part) > 63 {
