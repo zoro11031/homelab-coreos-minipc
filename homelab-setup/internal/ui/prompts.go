@@ -1,6 +1,10 @@
 //go:build !lint
 // +build !lint
 
+// Package ui provides interactive terminal UI components for the homelab setup
+// tool, including prompts (input, yes/no, select, multi-select, password),
+// formatted output (headers, steps, success/error messages), and progress indicators.
+// Supports both interactive and non-interactive modes for automation.
 package ui
 
 import (

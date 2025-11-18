@@ -1,6 +1,12 @@
+// Package steps implements the setup workflow steps for homelab configuration.
+// Each step is a function that performs a specific setup task (user creation,
+// directory setup, service deployment, etc.) and creates a completion marker
+// to track progress. Steps can be run individually or sequentially as part of
+// the complete setup workflow.
 package steps
 
 import (
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -249,6 +255,10 @@ func promptForConfig(cfg *config.Config, ui *ui.UI, publicKey string) (*WireGuar
 		return nil, fmt.Errorf("failed to prompt for interface IP: %w", err)
 	}
 	// Validate CIDR notation
+	// Note: CIDR validation is intentionally inlined here rather than using a shared
+	// validator function. This trades code reuse for simplicity. If validation logic
+	// needs to change (e.g., adding IPv6 support), also update the same validation
+	// in promptForPeer() below (line ~510).
 	if interfaceIP == "" {
 		return nil, fmt.Errorf("interface IP cannot be empty")
 	}
@@ -438,17 +448,17 @@ func promptForPeer(cfg *config.Config, ui *ui.UI, nextIP string) (*WireGuardPeer
 			ui.Info("WireGuard keys are 44 characters, base64-encoded, ending with '='")
 			continue
 		}
-		// Check for valid base64 characters
-		validKey := true
-		for i, c := range publicKey {
-			if !((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '+' || c == '/' || (c == '=' && i == 43)) {
-				validKey = false
-				break
-			}
+		// Validate it's actually valid base64 by attempting to decode
+		decoded, err := base64.StdEncoding.DecodeString(publicKey)
+		if err != nil {
+			ui.Error("Invalid WireGuard key: not valid base64 encoding")
+			ui.Info("WireGuard keys must be properly base64-encoded")
+			continue
 		}
-		if !validKey {
-			ui.Error("Invalid WireGuard key: contains invalid characters")
-			ui.Info("WireGuard keys are 44 characters, base64-encoded, ending with '='")
+		// WireGuard keys should decode to exactly 32 bytes (Curve25519 public key)
+		if len(decoded) != 32 {
+			ui.Error("Invalid WireGuard key: incorrect key length")
+			ui.Info("WireGuard keys must be 32 bytes (256 bits) when decoded")
 			continue
 		}
 		peer.PublicKey = publicKey
@@ -461,7 +471,7 @@ func promptForPeer(cfg *config.Config, ui *ui.UI, nextIP string) (*WireGuardPeer
 		if err != nil {
 			return nil, fmt.Errorf("failed to prompt for allowed IPs: %w", err)
 		}
-		// Validate CIDR notation
+		// Validate CIDR notation (matches validation in promptForConfig above)
 		if allowedIPs == "" {
 			ui.Error("Allowed IPs cannot be empty")
 			continue

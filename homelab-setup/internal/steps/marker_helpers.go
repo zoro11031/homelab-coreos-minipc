@@ -4,7 +4,16 @@ import "github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config
 
 // ensureCanonicalMarker checks for the canonical completion marker and migrates any legacy markers
 // to the canonical name to maintain backward compatibility.
-// This function is designed to be race-safe when called concurrently by multiple processes.
+//
+// Race Safety: This function is safe to call concurrently from multiple processes:
+//   - Uses MarkCompleteIfNotExists() with os.O_EXCL for atomic marker creation
+//   - Multiple processes can safely check/migrate markers simultaneously
+//   - Only the process that successfully creates the canonical marker cleans up legacy markers
+//   - If another process creates the canonical marker first, this returns (true, nil) without error
+//   - Legacy marker cleanup is best-effort and failures are silently ignored
+//
+// This ensures that even if two setup processes run concurrently, marker migration
+// happens exactly once without conflicts or duplicate work.
 func ensureCanonicalMarker(cfg *config.Config, canonical string, legacy ...string) (bool, error) {
 	// First check if canonical marker exists (fast path for completed steps)
 	if cfg.IsComplete(canonical) {

@@ -1,3 +1,7 @@
+// Package config provides thread-safe configuration management for the homelab
+// setup tool. It handles both persistent configuration storage (key-value pairs
+// in a config file) and completion markers (files indicating completed setup steps).
+// All operations are atomic and safe for concurrent use.
 package config
 
 import (
@@ -19,7 +23,9 @@ type Config struct {
 	mu        sync.RWMutex
 }
 
-// ensureLoaded loads configuration data from disk once before read operations
+// ensureLoaded loads configuration data from disk once before read operations.
+// This method must only be called while holding c.mu.RLock or c.mu.Lock.
+// The c.loaded check happens inside the caller's lock to prevent race conditions.
 func (c *Config) ensureLoaded() error {
 	if c.loaded {
 		return nil
@@ -186,6 +192,7 @@ func (c *Config) Set(key, value string) error {
 	defer c.mu.Unlock()
 
 	// Load existing configuration first to avoid overwriting
+	// Note: We're holding c.mu.Lock, so calling c.Load() directly is safe
 	if !c.loaded {
 		if err := c.Load(); err != nil {
 			return fmt.Errorf("failed to load existing config before set: %w", err)

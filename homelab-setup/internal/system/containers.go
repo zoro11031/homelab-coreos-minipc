@@ -1,3 +1,7 @@
+// Package system provides low-level system operations for the homelab setup tool,
+// including filesystem operations, package management, service control, user/group
+// management, network utilities, and container runtime abstraction. All operations
+// that interact with the OS are encapsulated here.
 package system
 
 import (

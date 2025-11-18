@@ -1,3 +1,6 @@
+// Package cli provides the command-line interface layer for the homelab setup
+// tool, including step orchestration, menu-driven interaction, and command
+// dispatch. It bridges user commands to the underlying setup step functions.
 package cli
 
 import (

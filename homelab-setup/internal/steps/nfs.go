@@ -88,6 +88,9 @@ func promptForNFSDetails(cfg *config.Config, ui *ui.UI) (host, export, mountPoin
 	}
 
 	// Validate IP or hostname
+	// Note: IP/hostname validation is intentionally inlined here rather than using a
+	// shared validator function. This trades code reuse for simplicity and keeps
+	// NFS-specific validation logic self-contained.
 	// Validate NFS server - must be valid IPv4 or hostname
 	isValidIP := false
 	if ip := net.ParseIP(host); ip != nil && ip.To4() != nil {

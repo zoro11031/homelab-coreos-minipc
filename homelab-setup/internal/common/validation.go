@@ -1,3 +1,6 @@
+// Package common provides shared utilities and validation functions used across
+// the homelab setup tool. This includes security-critical input validation
+// (paths, usernames) that prevents command injection and path traversal attacks.
 package common
 
 import (
