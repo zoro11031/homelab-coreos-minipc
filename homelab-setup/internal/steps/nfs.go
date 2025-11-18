@@ -309,7 +309,7 @@ func createFstabEntry(cfg *config.Config, ui *ui.UI, host, export, mountPoint st
 	// _netdev - Mount only after network is available
 	// nofail - Don't block boot if mount fails
 	// defaults - Use default mount options
-	fstabEntry := fmt.Sprintf("%s:%s %s nfs nfsvers=4.2,_netdev,nofail,defaults 0 0", host, export, mountPoint)
+	fstabEntry := fmt.Sprintf("%s:%s %s nfs defaults,nfsvers=4.2,_netdev,nofail 0 0", host, export, mountPoint)
 
 	// Read current fstab
 	fstabPath := "/etc/fstab"

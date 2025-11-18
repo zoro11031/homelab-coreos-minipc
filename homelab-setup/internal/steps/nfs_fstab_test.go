@@ -22,7 +22,7 @@ func TestFstabReplacement(t *testing.T) {
 /dev/sda1 / ext4 defaults 0 1
 192.168.1.10:/volume1/media /mnt/nas nfs defaults 0 0
 `,
-			newEntry:      "192.168.1.10:/volume1/media /mnt/nas nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+			newEntry:      "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 			mountPoint:    "/mnt/nas",
 			wantCommented: true,
 			wantNewEntry:  true,
@@ -33,7 +33,7 @@ func TestFstabReplacement(t *testing.T) {
 			existingFstab: `# /etc/fstab
 /dev/sda1 / ext4 defaults 0 1
 `,
-			newEntry:      "192.168.1.10:/volume1/media /mnt/nas nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+			newEntry:      "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 			mountPoint:    "/mnt/nas",
 			wantCommented: false,
 			wantNewEntry:  true,

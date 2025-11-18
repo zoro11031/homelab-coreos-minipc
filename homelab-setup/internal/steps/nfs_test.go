@@ -80,21 +80,21 @@ func TestFstabEntryFormat(t *testing.T) {
 			host:       "192.168.1.10",
 			export:     "/volume1/media",
 			mountPoint: "/mnt/nas",
-			want:       "192.168.1.10:/volume1/media /mnt/nas nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+			want:       "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 		},
 		{
 			name:       "hostname instead of IP",
 			host:       "nas.local",
 			export:     "/data",
 			mountPoint: "/mnt/data",
-			want:       "nas.local:/data /mnt/data nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+			want:       "nas.local:/data /mnt/data nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Build fstab entry using the same format as createFstabEntry
-			got := strings.TrimSpace(tt.host + ":" + tt.export + " " + tt.mountPoint + " nfs nfsvers=4.2,_netdev,nofail,defaults 0 0")
+			got := strings.TrimSpace(tt.host + ":" + tt.export + " " + tt.mountPoint + " nfs defaults,nfsvers=4.2,_netdev,nofail 0 0")
 			if got != tt.want {
 				t.Errorf("fstab entry format = %v, want %v", got, tt.want)
 			}
@@ -114,16 +114,16 @@ func TestFstabDuplicateDetection(t *testing.T) {
 		{
 			name:            "no existing entries",
 			existingLines:   []string{},
-			newEntry:        "192.168.1.10:/volume1/media /mnt/nas nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+			newEntry:        "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 			wantDuplicate:   false,
 			wantMountExists: false,
 		},
 		{
 			name: "exact duplicate exists",
 			existingLines: []string{
-				"192.168.1.10:/volume1/media /mnt/nas nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+				"192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 			},
-			newEntry:        "192.168.1.10:/volume1/media /mnt/nas nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+			newEntry:        "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 			wantDuplicate:   true,
 			wantMountExists: true, // Mount point exists (as part of the duplicate)
 		},
@@ -132,7 +132,7 @@ func TestFstabDuplicateDetection(t *testing.T) {
 			existingLines: []string{
 				"192.168.1.10:/volume1/media /mnt/nas nfs defaults 0 0",
 			},
-			newEntry:        "192.168.1.10:/volume1/media /mnt/nas nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+			newEntry:        "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 			wantDuplicate:   false,
 			wantMountExists: true,
 		},
@@ -141,7 +141,7 @@ func TestFstabDuplicateDetection(t *testing.T) {
 			existingLines: []string{
 				"# 192.168.1.10:/volume1/media /mnt/nas nfs defaults 0 0",
 			},
-			newEntry:        "192.168.1.10:/volume1/media /mnt/nas nfs nfsvers=4.2,_netdev,nofail,defaults 0 0",
+			newEntry:        "192.168.1.10:/volume1/media /mnt/nas nfs defaults,nfsvers=4.2,_netdev,nofail 0 0",
 			wantDuplicate:   false,
 			wantMountExists: false,
 		},
