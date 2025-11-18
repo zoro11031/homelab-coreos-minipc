@@ -37,10 +37,10 @@ func getServiceInfo(cfg *config.Config, serviceName string) *ServiceInfo {
 	caser := cases.Title(language.English)
 
 	// Determine unit name prefix based on runtime
-	runtimeStr := cfg.GetOrDefault(config.KeyContainerRuntime, "podman")
-	unitPrefix := "podman-compose"
-	if runtimeStr == "docker" {
-		unitPrefix = "docker-compose"
+	runtimeStr := cfg.GetOrDefault(config.KeyContainerRuntime, "docker")
+	unitPrefix := "docker-compose"
+	if runtimeStr == "podman" {
+		unitPrefix = "podman-compose"
 	}
 
 	return &ServiceInfo{
@@ -82,7 +82,7 @@ func checkExistingService(cfg *config.Config, ui *ui.UI, serviceInfo *ServiceInf
 
 // getRuntimeFromConfig is a helper to get container runtime from config
 func getRuntimeFromConfig(cfg *config.Config) (system.ContainerRuntime, error) {
-	runtimeStr := cfg.GetOrDefault("CONTAINER_RUNTIME", "podman")
+	runtimeStr := cfg.GetOrDefault("CONTAINER_RUNTIME", "docker")
 	switch runtimeStr {
 	case "podman":
 		return system.RuntimePodman, nil
@@ -386,7 +386,7 @@ func verifyContainers(cfg *config.Config, ui *ui.UI, serviceInfo *ServiceInfo) e
 		return err
 	}
 
-	runtimeStr := cfg.GetOrDefault("CONTAINER_RUNTIME", "podman")
+	runtimeStr := cfg.GetOrDefault("CONTAINER_RUNTIME", "docker")
 
 	// List running containers
 	containers, err := system.ListRunningContainers(runtime)

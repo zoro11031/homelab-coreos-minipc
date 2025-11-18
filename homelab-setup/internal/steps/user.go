@@ -130,7 +130,7 @@ func createUserIfNeeded(cfg *config.Config, username string, ui *ui.UI) error {
 	ui.Infof("User %s does not exist", username)
 
 	// Determine if we're using Docker (needs service account) or Podman (regular user)
-	runtime := cfg.GetOrDefault("CONTAINER_RUNTIME", "podman")
+	runtime := cfg.GetOrDefault("CONTAINER_RUNTIME", "docker")
 
 	// Ask if they want to create the user
 	createUser, err := ui.PromptYesNo(fmt.Sprintf("Create user %s?", username), true)

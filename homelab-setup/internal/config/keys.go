@@ -40,7 +40,7 @@ const (
 // Default values for configuration keys
 var Defaults = map[string]string{
 	KeyContainersBase:     "/srv/containers",
-	KeyContainerRuntime:   "podman",
+	KeyContainerRuntime:   "docker", // Docker is the default runtime (Podman also supported)
 	KeyNFSMountPoint:      "/mnt/nas",
 	KeyNetworkTestRetries: "5",
 	KeyNetworkTestTimeout: "10",
