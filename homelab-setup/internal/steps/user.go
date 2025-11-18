@@ -115,7 +115,8 @@ func validateUser(username string, ui *ui.UI) error {
 }
 
 // createUserIfNeeded creates a user if they don't exist
-func createUserIfNeeded(username string, ui *ui.UI) error {
+// For Docker runtime, creates a system service account with /sbin/nologin
+func createUserIfNeeded(cfg *config.Config, username string, ui *ui.UI) error {
 	exists, err := system.UserExists(username)
 	if err != nil {
 		return fmt.Errorf("failed to check if user exists: %w", err)
@@ -128,6 +129,9 @@ func createUserIfNeeded(username string, ui *ui.UI) error {
 
 	ui.Infof("User %s does not exist", username)
 
+	// Determine if we're using Docker (needs service account) or Podman (regular user)
+	runtime := cfg.GetOrDefault("CONTAINER_RUNTIME", "podman")
+
 	// Ask if they want to create the user
 	createUser, err := ui.PromptYesNo(fmt.Sprintf("Create user %s?", username), true)
 	if err != nil {
@@ -138,25 +142,44 @@ func createUserIfNeeded(username string, ui *ui.UI) error {
 		return fmt.Errorf("user %s does not exist and was not created", username)
 	}
 
-	// Create user with home directory
-	ui.Infof("Creating user %s...", username)
-	if err := system.CreateUser(username, true); err != nil {
-		return fmt.Errorf("failed to create user: %w", err)
-	}
+	if runtime == "docker" {
+		// Create system service account for Docker
+		ui.Info("Creating system service account for Docker (non-login shell)...")
+		ui.Info("Note: Containers will run as this UID via PUID/PGID while Docker daemon runs as root")
 
-	ui.Successf("User %s created successfully", username)
+		if err := system.CreateSystemUser(username, false, "/sbin/nologin"); err != nil {
+			return fmt.Errorf("failed to create system user: %w", err)
+		}
 
-	// Add user to wheel group for sudo access
-	addToWheel, err := ui.PromptYesNo(fmt.Sprintf("Add %s to 'wheel' group (sudo privileges)?", username), true)
-	if err != nil {
-		return fmt.Errorf("failed to prompt for wheel group: %w", err)
-	}
+		ui.Successf("System service account %s created successfully", username)
 
-	if addToWheel {
-		if err := system.AddUserToGroup(username, "wheel"); err != nil {
-			ui.Warning(fmt.Sprintf("Failed to add user to wheel group: %v", err))
-		} else {
-			ui.Success("User added to 'wheel' group")
+		// Get and display the assigned UID/GID
+		uid, _ := system.GetUID(username)
+		gid, _ := system.GetGID(username)
+		ui.Infof("Assigned UID=%d, GID=%d", uid, gid)
+		ui.Info("This account uses /sbin/nologin (no interactive login)")
+
+	} else {
+		// Create regular user for Podman (rootless)
+		ui.Infof("Creating user %s...", username)
+		if err := system.CreateUser(username, true); err != nil {
+			return fmt.Errorf("failed to create user: %w", err)
+		}
+
+		ui.Successf("User %s created successfully", username)
+
+		// Add user to wheel group for sudo access
+		addToWheel, err := ui.PromptYesNo(fmt.Sprintf("Add %s to 'wheel' group (sudo privileges)?", username), true)
+		if err != nil {
+			return fmt.Errorf("failed to prompt for wheel group: %w", err)
+		}
+
+		if addToWheel {
+			if err := system.AddUserToGroup(username, "wheel"); err != nil {
+				ui.Warning(fmt.Sprintf("Failed to add user to wheel group: %v", err))
+			} else {
+				ui.Success("User added to 'wheel' group")
+			}
 		}
 	}
 
@@ -243,6 +266,83 @@ func setupShell(username string, ui *ui.UI) error {
 	return nil
 }
 
+// validatePUIDPGID validates that stored PUID/PGID match the current user's UID/GID
+// If they don't match, prompts user to decide whether to update or abort
+func validatePUIDPGID(cfg *config.Config, username string, ui *ui.UI) error {
+	// Get current UID/GID
+	currentUID, err := system.GetUID(username)
+	if err != nil {
+		return fmt.Errorf("failed to get UID: %w", err)
+	}
+
+	currentGID, err := system.GetGID(username)
+	if err != nil {
+		return fmt.Errorf("failed to get GID: %w", err)
+	}
+
+	// Check if PUID/PGID are already stored in config
+	storedPUID := cfg.GetOrDefault("PUID", "")
+	storedPGID := cfg.GetOrDefault("PGID", "")
+
+	if storedPUID == "" && storedPGID == "" {
+		// No stored values, this is fine
+		ui.Infof("No previous PUID/PGID found, will use current values: UID=%d, GID=%d", currentUID, currentGID)
+		return nil
+	}
+
+	// Parse stored values
+	var expectedUID, expectedGID int
+	if storedPUID != "" {
+		if _, err := fmt.Sscanf(storedPUID, "%d", &expectedUID); err != nil {
+			ui.Warning(fmt.Sprintf("Invalid stored PUID value: %s", storedPUID))
+			return nil // Non-fatal, will overwrite
+		}
+	}
+	if storedPGID != "" {
+		if _, err := fmt.Sscanf(storedPGID, "%d", &expectedGID); err != nil {
+			ui.Warning(fmt.Sprintf("Invalid stored PGID value: %s", storedPGID))
+			return nil // Non-fatal, will overwrite
+		}
+	}
+
+	// Validate consistency
+	if expectedUID != 0 && expectedUID != currentUID {
+		ui.Warning(fmt.Sprintf("UID mismatch: user %s has UID=%d but config has PUID=%d", username, currentUID, expectedUID))
+		ui.Info("This can cause permission issues with existing container data")
+		ui.Info("Recovery options:")
+		ui.Info("  1. Update config to use current UID (recommended if user was recreated)")
+		ui.Info("  2. Abort and use the original user")
+
+		useCurrentUID, err := ui.PromptYesNo("Update PUID to match current user's UID?", true)
+		if err != nil {
+			return fmt.Errorf("failed to prompt: %w", err)
+		}
+		if !useCurrentUID {
+			return fmt.Errorf("UID mismatch - please use the original user or fix manually")
+		}
+		ui.Info("Will update PUID to match current UID")
+	}
+
+	if expectedGID != 0 && expectedGID != currentGID {
+		ui.Warning(fmt.Sprintf("GID mismatch: user %s has GID=%d but config has PGID=%d", username, currentGID, expectedGID))
+
+		useCurrentGID, err := ui.PromptYesNo("Update PGID to match current user's GID?", true)
+		if err != nil {
+			return fmt.Errorf("failed to prompt: %w", err)
+		}
+		if !useCurrentGID {
+			return fmt.Errorf("GID mismatch - please use the original user or fix manually")
+		}
+		ui.Info("Will update PGID to match current GID")
+	}
+
+	if (expectedUID == 0 || expectedUID == currentUID) && (expectedGID == 0 || expectedGID == currentGID) {
+		ui.Success(fmt.Sprintf("UID/GID consistent: PUID=%d, PGID=%d", currentUID, currentGID))
+	}
+
+	return nil
+}
+
 // getTimezoneInfo gets and displays timezone information
 func getTimezoneInfo(cfg *config.Config, ui *ui.UI) error {
 	tz, err := system.GetTimezone()
@@ -309,13 +409,19 @@ func RunUserSetup(cfg *config.Config, ui *ui.UI) error {
 	ui.Step("Validating User Account")
 	if err := validateUser(username, ui); err != nil {
 		// User doesn't exist, try to create
-		if err := createUserIfNeeded(username, ui); err != nil {
+		if err := createUserIfNeeded(cfg, username, ui); err != nil {
 			return fmt.Errorf("user setup failed: %w", err)
 		}
 		// Validate again after creation
 		if err := validateUser(username, ui); err != nil {
 			return fmt.Errorf("user validation failed after creation: %w", err)
 		}
+	}
+
+	// Check if stored PUID/PGID exist and validate against current user
+	ui.Step("Validating UID/GID Consistency")
+	if err := validatePUIDPGID(cfg, username, ui); err != nil {
+		return fmt.Errorf("UID/GID validation failed: %w", err)
 	}
 
 	// Get UID and GID for config

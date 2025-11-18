@@ -140,6 +140,35 @@ func CreateUser(username string, createHome bool) error {
 	return nil
 }
 
+// CreateSystemUser creates a system service account with non-login shell
+// Suitable for Docker daemon services (containers run as this UID via PUID/PGID)
+func CreateSystemUser(username string, createHome bool, shell string) error {
+	args := []string{"useradd"}
+
+	// Create as system account (UID < 1000)
+	args = append(args, "--system")
+
+	if createHome {
+		args = append(args, "-m")
+	}
+
+	// Set shell (default to nologin for service accounts)
+	if shell == "" {
+		shell = "/sbin/nologin"
+	}
+	args = append(args, "-s", shell)
+
+	args = append(args, username)
+
+	cmd := exec.Command("sudo", append([]string{"-n"}, args...)...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("failed to create system user %s: %w\nOutput: %s", username, err, string(output))
+	}
+
+	return nil
+}
+
 // DeleteUser deletes a user
 func DeleteUser(username string, removeHome bool) error {
 	args := []string{"userdel"}
@@ -303,4 +332,40 @@ func GetTimezone() (string, error) {
 	}
 
 	return timezone, nil
+}
+
+// ValidateUserIDsMatch checks if a user's current UID/GID match expected values
+// Returns (uidMatches, gidMatches, currentUID, currentGID, error)
+func ValidateUserIDsMatch(username string, expectedUID, expectedGID int) (bool, bool, int, int, error) {
+	currentUID, err := GetUID(username)
+	if err != nil {
+		return false, false, 0, 0, fmt.Errorf("failed to get current UID: %w", err)
+	}
+
+	currentGID, err := GetGID(username)
+	if err != nil {
+		return false, false, 0, 0, fmt.Errorf("failed to get current GID: %w", err)
+	}
+
+	uidMatches := (currentUID == expectedUID)
+	gidMatches := (currentGID == expectedGID)
+
+	return uidMatches, gidMatches, currentUID, currentGID, nil
+}
+
+// GetUserShell returns the login shell for a user by parsing /etc/passwd
+func GetUserShell(username string) (string, error) {
+	cmd := exec.Command("getent", "passwd", username)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to get passwd entry for %s: %w", username, err)
+	}
+
+	// Parse /etc/passwd format: username:x:uid:gid:gecos:home:shell
+	fields := strings.Split(strings.TrimSpace(string(output)), ":")
+	if len(fields) < 7 {
+		return "", fmt.Errorf("invalid passwd entry for %s", username)
+	}
+
+	return fields[6], nil
 }
