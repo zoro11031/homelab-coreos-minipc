@@ -52,27 +52,6 @@ ignition/*.bu
 ignition/*.ign
 !ignition/*.template
 
-# Go build artifacts (local build directory only)
-# Note: files/system/usr/bin/homelab-setup is intentionally tracked
-homelab-setup/bin/*
-!homelab-setup/bin/.gitkeep
-homelab-setup/homelab-setup
-homelab-setup/*.exe
-homelab-setup/*.dll
-homelab-setup/*.so
-homelab-setup/*.dylib
-# Force track binaries in files/system/usr/bin
-!files/system/usr/bin/homelab-setup
-
-# Go test artifacts
-homelab-setup/*.test
-homelab-setup/*.out
-homelab-setup/coverage.out
-homelab-setup/coverage.html
-homelab-setup/.coverage
-
-# Go vendor directory (if using vendoring)
-homelab-setup/vendor/
-
-# Dev container volumes (local development)
-.devcontainer/.cache/
+# homelab-setup source is now in separate repo: plex-migration-homelab/homelab-setup
+# Only the compiled binary at files/system/usr/bin/homelab-setup is tracked here
+homelab-setup-src/

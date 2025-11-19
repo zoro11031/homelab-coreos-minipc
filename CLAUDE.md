@@ -7,14 +7,16 @@
 
 ## Project Overview
 
-This repository contains a declarative homelab management system for NAB9 mini PCs running Fedora CoreOS. It consists of:
+This repository contains BlueBuild configuration for building custom Fedora CoreOS images for NAB9 mini PCs. It consists of:
 
 1. **Custom CoreOS Image** - BlueBuild-based image layering on UBlue uCore
-2. **Setup CLI Tool** - Go-based interactive wizard for post-installation configuration
+2. **Setup CLI Tool Binary** - Compiled `homelab-setup` binary bundled in the image (source maintained separately at [plex-migration-homelab/homelab-setup](https://github.com/plex-migration-homelab/homelab-setup))
 3. **Infrastructure as Code** - Butane/Ignition configs, systemd units, compose stacks
 
 **Key Services**: Plex, Jellyfin (hardware transcoding), Nextcloud, Immich, Overseerr, Nginx Proxy Manager
 **Architecture**: Intel QuickSync GPU, WireGuard VPN tunnel to VPS, NFS-backed media storage
+
+**Note**: The Go source code for the `homelab-setup` CLI has been moved to a dedicated repository. This repo only contains the compiled binary and image configuration.
 
 ---
 
@@ -22,19 +24,6 @@ This repository contains a declarative homelab management system for NAB9 mini P
 
 ```
 homelab-coreos-minipc/
-├── homelab-setup/              # Go CLI tool (10,275+ lines)
-│   ├── cmd/homelab-setup/      # CLI commands & entry point
-│   ├── internal/               # Unexported packages
-│   │   ├── cli/                # Interactive menu system
-│   │   ├── config/             # Configuration & state management
-│   │   ├── common/             # Validators (IP, port, CIDR, paths)
-│   │   ├── system/             # System operations (packages, services, users)
-│   │   ├── steps/              # Setup steps (preflight, user, nfs, wireguard, etc.)
-│   │   └── ui/                 # User interface (prompts, spinners, colors)
-│   ├── pkg/version/            # Version info (injected at build)
-│   ├── go.mod, go.sum          # Dependencies (cobra, color, term)
-│   └── Makefile                # Build automation
-│
 ├── recipes/                    # BlueBuild image recipes
 │   ├── recipe.yml              # Main recipe (base: ucore, modules)
 │   ├── packages.yml            # Package installation manifest
@@ -45,7 +34,7 @@ homelab-coreos-minipc/
 │   ├── system/                 # Filesystem overlay (/etc, /usr)
 │   │   ├── etc/systemd/system/ # Compose & WireGuard services
 │   │   ├── etc/profile.d/      # Intel VAAPI environment
-│   │   └── usr/local/bin/      # Compiled Go binary
+│   │   └── usr/bin/            # Compiled homelab-setup binary (auto-updated via GitHub Actions)
 │   └── setup_scripts/          # Legacy bash setup scripts
 │
 ├── ignition/                   # CoreOS first-boot provisioning
@@ -60,9 +49,8 @@ homelab-coreos-minipc/
 │
 ├── .github/workflows/          # CI/CD
 │   ├── build.yml               # BlueBuild image builds (daily @ 06:00 UTC)
-│   └── build-homelab-setup.yml # Go binary builds (auto-commit)
+│   └── build-homelab-setup.yml # Fetches & builds binary from plex-migration-homelab/homelab-setup
 │
-├── .devcontainer/              # Development container
 ├── .vscode/                    # VS Code configuration
 └── modules/                    # Custom BlueBuild modules
 ```
@@ -71,12 +59,13 @@ homelab-coreos-minipc/
 
 ## Technology Stack
 
-### Primary Language: Go 1.23.3
+### Primary Technologies
 
-**Dependencies** (from `homelab-setup/go.mod`):
-- `github.com/spf13/cobra@v1.10.1` - CLI framework
-- `github.com/fatih/color@v1.18.0` - Terminal colors
-- `golang.org/x/term` - Terminal utilities
+**This Repository**: BlueBuild YAML configuration, Butane/Ignition configs, shell scripts
+
+**homelab-setup CLI** (separate repo: [plex-migration-homelab/homelab-setup](https://github.com/plex-migration-homelab/homelab-setup)):
+- Go 1.23.3
+- Dependencies: cobra, fatih/color, golang.org/x/term
 
 ### Infrastructure
 
@@ -98,59 +87,17 @@ homelab-coreos-minipc/
 
 ## Development Workflows
 
-### Setting Up Development Environment
+### Working with This Repository
 
-**Option 1: Devcontainer** (Recommended)
-```bash
-# Open in VS Code with devcontainer extension
-# Includes: Go 1.23, golangci-lint v1.60.1, zsh, git, sudo
-```
+This repo contains BlueBuild configuration only. For Go development on the `homelab-setup` CLI, see the separate repository at [plex-migration-homelab/homelab-setup](https://github.com/plex-migration-homelab/homelab-setup).
 
-**Option 2: Local Development**
-```bash
-cd homelab-setup/
-make deps        # Download dependencies
-make build       # Build binary
-make test        # Run tests
-make lint        # Run linter
-```
+**Typical workflow here**:
+1. Edit BlueBuild recipes (`recipes/*.yml`)
+2. Modify system overlays (`files/system/`)
+3. Update Butane configs (`ignition/*.bu.template`)
+4. GitHub Actions automatically fetches and builds the latest homelab-setup binary
 
 ### Common Development Tasks
-
-#### Building the Go CLI
-
-
-```bash
-cd homelab-setup/
-
-# Build for current platform
-make build
-# Output: bin/homelab-setup
-
-# Build for all architectures
-make build-all
-# Output: bin/homelab-setup-linux-amd64, bin/homelab-setup-linux-arm64
-
-# Run directly
-make run
-
-# Format, vet, and tidy
-make fmt vet tidy
-```
-
-#### Running Tests
-
-```bash
-# All tests
-make test
-
-# Verbose with coverage
-make test-verbose
-
-# Generate HTML coverage report
-make test-coverage
-# Open: coverage.html
-```
 
 #### Building the Custom Image
 
@@ -173,19 +120,14 @@ bluebuild build recipes/recipe.yml
 
 ### Code Review Checklist
 
-**Before Committing**:
-1. **Format**: `make fmt` (gofmt)
-2. **Lint**: `make lint` (golangci-lint)
-3. **Test**: `make test` (all tests pass)
-4. **Vet**: `make vet` (go vet clean)
-5. **Build**: `make build` (compiles successfully)
+**Before Committing** (this repo):
+1. Validate YAML syntax in `recipes/*.yml`
+2. Test Butane config transpilation: `cd ignition && ./transpile.sh`
+3. Verify file paths in `files/` match systemd unit expectations
+4. Check GitHub Actions workflow syntax
 
-**Go Code Quality**:
-- No security vulnerabilities (SQL injection, command injection, XSS)
-- Error handling with context: `fmt.Errorf("context: %w", err)`
-- Input validation using `internal/common` validators
-- Sudo operations use `sudo -n` (non-interactive)
-- Paths validated with `ValidateSafePath()` to prevent injection
+**For Go CLI Development** (separate repo):
+- See [plex-migration-homelab/homelab-setup](https://github.com/plex-migration-homelab/homelab-setup) for development guidelines
 
 **File Operations**:
 - Use `Read` tool for reading files
@@ -371,30 +313,19 @@ make test-coverage
 
 ## Build & Deployment
 
-### Go Binary Build
-
-**Makefile Targets**:
-```bash
-make build       # Single architecture (current)
-make build-all   # Multi-arch (amd64, arm64)
-make install     # Install to GOPATH/bin
-```
-
-**Version Injection**:
-```makefile
-# Automatically set via ldflags
-VERSION=0.1.0-dev
-GIT_COMMIT=$(git rev-parse --short HEAD)
-BUILD_DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-```
+### Binary Build (Automated)
 
 **CI/CD Binary Build** (`.github/workflows/build-homelab-setup.yml`):
-1. Triggered on push to `homelab-setup/**`
-2. Runs tests: `go test ./... -v`
-3. Builds binary: `make build`
-4. Copies to: `/files/system/usr/bin/homelab-setup`
-5. Auto-commits if changed (git-actions bot)
-6. Uploads artifact (30-day retention)
+1. Triggered: Daily at 02:00 UTC, manual dispatch, or workflow file changes
+2. Checks out: `plex-migration-homelab/homelab-setup` to temp dir
+3. Runs tests: `go test ./... -v`
+4. Builds binary: `make build`
+5. Copies to: `files/system/usr/bin/homelab-setup`
+6. Auto-commits if changed (using `GH_PAT` secret)
+7. Uploads artifact (30-day retention)
+
+**Manual Trigger**:
+- Go to Actions → "Build homelab-setup Binary" → "Run workflow"
 
 ### Image Build
 
@@ -495,240 +426,157 @@ HOMELAB_USER=containeruser ./homelab-setup
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `homelab-setup/cmd/homelab-setup/main.go` | CLI entry point | ~100 |
-| `homelab-setup/internal/cli/menu.go` | Interactive menu | ~400 |
-| `homelab-setup/internal/common/validation.go` | Input validators | ~200 |
-| `homelab-setup/internal/config/config.go` | Configuration management | ~300 |
-| `homelab-setup/internal/steps/preflight.go` | Preflight checks | ~150 |
 | `recipes/recipe.yml` | Image build recipe | ~25 |
+| `recipes/packages.yml` | Package installation manifest | ~50 |
+| `recipes/systemd.yml` | Systemd unit definitions | ~30 |
+| `files/system/` | Filesystem overlay structure | - |
+| `ignition/config.bu.template` | First-boot configuration | ~100 |
 | `.github/workflows/build.yml` | Image CI/CD | ~45 |
+| `.github/workflows/build-homelab-setup.yml` | Binary build from upstream | ~70 |
 | `docs/getting-started.md` | User quickstart | ~200 |
-
-### Critical Security Files
-
-| File | Security Concern | Pattern |
-|------|------------------|---------|
-| `homelab-setup/internal/common/validation.go` | Command injection prevention | `ValidateSafePath()` |
-| `homelab-setup/internal/system/filesystem.go` | Sudo operations | `sudo -n` only |
-| `homelab-setup/internal/system/commandrunner.go` | Command execution | `exec.Command()` (no shell) |
 
 ### Build Configuration
 
 | File | Purpose |
 |------|---------|
-| `homelab-setup/Makefile` | Build automation |
-| `homelab-setup/go.mod` | Go dependencies |
+| `recipes/*.yml` | BlueBuild image recipes |
+| `ignition/*.bu.template` | Butane configuration templates |
 | `.editorconfig` | Cross-editor formatting |
-| `.vscode/settings.json` | VS Code Go configuration |
-| `.github/workflows/build-homelab-setup.yml` | Binary CI/CD |
+| `.vscode/settings.json` | VS Code configuration |
+| `.github/workflows/build.yml` | Image build CI/CD |
+| `.github/workflows/build-homelab-setup.yml` | Binary build from upstream |
 
 ---
 
 ## Important Patterns to Follow
 
-### 1. User Interaction Pattern
+### 1. BlueBuild Recipe Structure
 
-```go
-// Always use UI methods from internal/ui
-ui := ui.NewUI()
+```yaml
+# recipes/recipe.yml
+base-image: ghcr.io/ublue-os/ucore
+image-version: stable
 
-// Prompts with validation
-username, err := ui.PromptWithValidation(
-    "Enter username",
-    "containeruser",
-    common.ValidateUsername,
-)
-
-// Confirmation
-confirmed, err := ui.PromptConfirm("Proceed?", true)
-
-// Password (hidden input)
-password, err := ui.PromptPassword("Enter password")
-
-// Selection
-choice, err := ui.PromptSelect("Choose runtime", []string{"podman", "docker"})
-
-// Output
-ui.Success("Operation completed")
-ui.Error("Operation failed: " + err.Error())
-ui.Warning("This is a warning")
-ui.Info("Information message")
-
-// Spinner for long operations
-spinner := ui.NewSpinner("Processing...")
-spinner.Start()
-// ... do work ...
-spinner.Stop()
-ui.Success("Done!")
+modules:
+  - type: script
+    scripts:
+      - install-rpmfusion-release.sh
+  - from-file: packages.yml
+  - type: files
+    files:
+      - source: system
+        destination: /
+  - from-file: systemd.yml
 ```
 
-### 2. Configuration Pattern
+### 2. Systemd Unit Pattern
 
-```go
-import "github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
+```ini
+# files/system/etc/systemd/system/example.service
+[Unit]
+Description=Example Service
+After=network-online.target
+Wants=network-online.target
 
-// Load config
-cfg, err := config.NewConfig("~/.homelab-setup.conf")
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/containers/example
+ExecStart=/usr/bin/podman-compose up -d
+ExecStop=/usr/bin/podman-compose down
 
-// Read values
-user := cfg.Get(config.KeyHomelabUser, "defaultuser")
-runtime := cfg.Get(config.KeyContainerRuntime, "podman")
-
-// Write values
-if err := cfg.Set(config.KeyPUID, "1001"); err != nil {
-    return err
-}
-
-// Markers
-markers := config.NewMarkers("~/.local/homelab-setup")
-if markers.IsComplete("preflight") {
-    fmt.Println("Preflight already completed")
-}
-markers.MarkComplete("preflight")
+[Install]
+WantedBy=multi-user.target
 ```
 
-### 3. System Operations Pattern
+### 3. Butane Configuration Pattern
 
-```go
-import "github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/system"
-
-// Check sudo
-if !system.HasSudo() {
-    return fmt.Errorf("sudo access required")
-}
-
-// Create directory (with sudo)
-if err := system.CreateDirectory("/srv/containers/media", "containeruser", "containeruser", 0755); err != nil {
-    return err
-}
-
-// Install packages (rpm-ostree)
-packages := []string{"wireguard-tools", "nfs-utils"}
-if err := system.InstallPackages(packages); err != nil {
-    return err
-}
-
-// Enable systemd service
-if err := system.EnableService("wg-quick@wg0"); err != nil {
-    return err
-}
-```
-
-### 4. Setup Step Pattern
-
-```go
-import "github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/steps"
-
-// Each step implements this interface
-type Step interface {
-    Name() string
-    Description() string
-    Run() error
-    IsComplete() bool
-    Skip() bool
-}
-
-// Example step structure
-type PreflightStep struct {
-    ui      *ui.UI
-    config  *config.Config
-    markers *config.Markers
-}
-
-func (s *PreflightStep) Run() error {
-    s.ui.Info("Running preflight checks...")
-
-    // Check rpm-ostree
-    if !system.IsRpmOstree() {
-        return fmt.Errorf("not running rpm-ostree")
-    }
-
-    // Check packages
-    required := []string{"podman", "git", "wireguard-tools"}
-    for _, pkg := range required {
-        if !system.IsPackageInstalled(pkg) {
-            return fmt.Errorf("required package not installed: %s", pkg)
-        }
-    }
-
-    // Mark complete
-    s.markers.MarkComplete("preflight")
-    s.ui.Success("Preflight checks passed!")
-    return nil
-}
+```yaml
+# ignition/config.bu.template
+variant: fcos
+version: 1.4.0
+passwd:
+  users:
+    - name: core
+      ssh_authorized_keys:
+        - "ssh-ed25519 AAAA..."
+      password_hash: "$6$..."
+storage:
+  directories:
+    - path: /home/core/setup
+      mode: 0755
+systemd:
+  units:
+    - name: auto-rebase.service
+      enabled: true
 ```
 
 ---
 
 ## Common Pitfalls to Avoid
 
-### Security
+### BlueBuild Configuration
 
-1. **Never execute shell commands with user input**
-   - ❌ `exec.Command("sh", "-c", "mkdir " + userPath)`
-   - ✅ `exec.Command("sudo", "-n", "mkdir", "-p", userPath)`
+1. **YAML syntax validation**
+   - Use 2-space indentation for YAML files
+   - Validate with BlueBuild CLI before committing
+   - Test recipe changes locally first
 
-2. **Always validate paths before system operations**
-   - ❌ `system.CreateDirectory(userInput, ...)`
-   - ✅ `ValidateSafePath(userInput); system.CreateDirectory(userInput, ...)`
+2. **File paths in recipes**
+   - Use absolute paths from image root (`/etc/`, `/usr/`)
+   - Ensure source files exist in `files/` directory
+   - Match systemd unit paths with actual file locations
 
-3. **Never use interactive sudo**
-   - ❌ `sudo mkdir /srv/containers`
-   - ✅ `sudo -n mkdir /srv/containers` (fail if password required)
+3. **Module ordering matters**
+   - Scripts run before file copying
+   - Packages install before systemd units
+   - Check module dependencies
 
-### File Operations
+### Ignition/Butane
 
-1. **Prefer editing existing files over creating new ones**
-   - ❌ Creating new documentation files
-   - ✅ Updating existing README.md, docs/
+1. **Butane transpilation**
+   - Always test with `./ignition/transpile.sh`
+   - Validate FCOS version compatibility (1.4.0)
+   - Check password hash format (`$6$...`)
 
-2. **Don't use bash for file operations**
-   - ❌ `bash cat file.txt`
-   - ✅ `Read` tool
+2. **First-boot timing**
+   - Units may run before network is ready
+   - Use `After=network-online.target`
+   - Test rebase units in VM
 
-3. **Preserve exact indentation when editing**
-   - Read file first, note indentation style (tabs vs spaces)
-   - Match existing style in edits
+### Documentation
 
-### Testing
-
-1. **Always write table-driven tests**
-   - ❌ One test per case
-   - ✅ Table-driven with multiple cases
-
-2. **Test edge cases**
-   - Empty strings
-   - Nil values
-   - Maximum values (ports: 65535, IPs: 255.255.255.255)
-   - Invalid formats
-
-3. **Run tests before committing**
-   - `make test` must pass
-   - `make lint` must be clean
+1. **Keep docs synchronized**
+   - Update README.md when changing architecture
+   - Document new systemd units in reference docs
+   - Update AGENTS.md and CLAUDE.md for major changes
 
 ---
 
 ## Quick Reference Commands
 
-### Development
+### BlueBuild Development
 
 ```bash
-# Setup
-cd homelab-setup/
-make deps
+# Test Butane transpilation
+cd ignition/
+./transpile.sh
 
-# Build & Test
-make build test lint
+# Build image locally (requires BlueBuild CLI)
+bluebuild build recipes/recipe.yml
 
-# Coverage
-make test-coverage
-open coverage.html
+# Validate YAML syntax
+yamllint recipes/*.yml
+```
 
-# Format & Clean
-make fmt vet tidy clean
+### Binary Management
 
-# Multi-arch build
-make build-all
+```bash
+# Trigger binary rebuild (GitHub Actions)
+# Go to: Actions → "Build homelab-setup Binary" → "Run workflow"
+
+# Check current binary
+ls -lh files/system/usr/bin/homelab-setup
 ```
 
 ### Git Workflow
@@ -758,20 +606,20 @@ bluebuild build recipes/recipe.yml
 ### Debugging
 
 ```bash
-# Check Go binary version
-./bin/homelab-setup version
+# Check binary version (on deployed system)
+/usr/bin/homelab-setup version
 
 # Check setup status
-./bin/homelab-setup status
+/usr/bin/homelab-setup status
 
-# Run troubleshooting
-./bin/homelab-setup troubleshoot
+# View systemd units
+systemctl list-units | grep -E "podman|docker|wg-quick"
 
-# Check markers
-ls -la ~/.local/homelab-setup/
+# Check image version
+rpm-ostree status
 
-# Check config
-cat ~/.homelab-setup.conf
+# View rebase logs
+journalctl -u auto-rebase.service
 ```
 
 ---
@@ -805,8 +653,9 @@ cat ~/.homelab-setup.conf
 
 | Date | Change |
 |------|--------|
+| 2025-11-19 | Migrated homelab-setup Go source to separate repo (plex-migration-homelab/homelab-setup); this repo now contains only BlueBuild config and compiled binary |
 | 2025-11-17 | Initial CLAUDE.md creation |
 
 ---
 
-**For AI Assistants**: This document is your primary reference. Follow the patterns, conventions, and security practices outlined here. When in doubt, examine existing code in similar files for examples. Always prioritize security (validate inputs, use safe paths, no shell injection) and maintainability (tests, documentation, clear error messages).
+**For AI Assistants**: This repository is now focused on BlueBuild image configuration only. The Go CLI source code has been moved to [plex-migration-homelab/homelab-setup](https://github.com/plex-migration-homelab/homelab-setup). When working with this repo, focus on YAML recipes, Butane configs, systemd units, and shell scripts. For Go development, refer to the separate repository.

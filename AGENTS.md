@@ -1,7 +1,7 @@
 # AGENTS.md - AI Contributor Guide
 
 ## Purpose
-This repository uses declarative configs and Go tooling to build and configure Fedora CoreOS-based homelab images for NAB9 mini PCs. Use this guide as the authoritative reference for AI-driven changes.
+This repository contains BlueBuild configuration and declarative configs to build Fedora CoreOS-based homelab images for NAB9 mini PCs. Use this guide as the authoritative reference for AI-driven changes.
 
 ## Scope
 Applies to all files in this repository unless superseded by a more specific AGENTS.md.
@@ -9,26 +9,20 @@ Applies to all files in this repository unless superseded by a more specific AGE
 ## Development Principles
 - Match existing patterns and naming; prefer small, focused commits.
 - Protect correctness and stability: validate inputs, avoid shell injection, and keep paths safe.
-- Tests are mandatory for code changes. For Go code, use table-driven tests covering edge cases.
 - Keep documentation in sync with behavior changes.
 
 ## Tooling & Commands
-- Primary language: Go 1.23.3. Key deps: cobra, fatih/color, golang.org/x/term.
-- Common commands (from `homelab-setup/`):
-  - `make deps`
-  - `make build`
-  - `make test`
-  - `make lint`
-  - `make fmt vet tidy clean`
+- Primary tools: BlueBuild recipes, Butane/Ignition configs, systemd units, shell scripts.
 - Images: BlueBuild recipes under `recipes/`; provisioning via Butane/Ignition in `ignition/`.
+- Binary updates: GitHub Actions automatically fetches and builds the `homelab-setup` binary from the separate [plex-migration-homelab/homelab-setup](https://github.com/plex-migration-homelab/homelab-setup) repository.
 
 ## Repository Structure
-- `homelab-setup/`: Go CLI for setup (cmd entrypoint, internal packages, pkg/version).
 - `recipes/`: BlueBuild image recipe and manifests.
-- `files/`: System overlays, scripts, and bundled assets.
+- `files/`: System overlays, scripts, and bundled assets (including the compiled `homelab-setup` binary at `files/system/usr/bin/homelab-setup`).
 - `ignition/`: Butane templates and transpile scripts.
 - `docs/`: Guides, references, and testing checklists.
 - `modules/`: Custom BlueBuild modules.
+- `.github/workflows/`: GitHub Actions for building the homelab-setup binary from upstream.
 
 ## Git Workflow
 - Feature branches should use `claude/<description>-<session-id>` when creating new branches.

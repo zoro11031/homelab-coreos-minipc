@@ -3,14 +3,12 @@ name: Build homelab-setup Binary
 on:
   push:
     paths:
-      - 'homelab-setup/**'
       - '.github/workflows/build-homelab-setup.yml'
     branches:
       - main
-  pull_request:
-    paths:
-      - 'homelab-setup/**'
-      - '.github/workflows/build-homelab-setup.yml'
+  schedule:
+    # Run daily at 02:00 UTC to check for updates from upstream
+    - cron: '0 2 * * *'
   workflow_dispatch:
 
 concurrency:
@@ -19,34 +17,41 @@ concurrency:
 
 jobs:
   build:
-    name: Build Go Binary
+    name: Build Go Binary from Forked Repo
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout this BlueBuild repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # Needed for git commit info
-          token: ${{ secrets.GH_PAT }}  # Use PAT with write permissions
+          fetch-depth: 0
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Checkout homelab-setup source from forked repo
+        uses: actions/checkout@v4
+        with:
+          repository: plex-migration-homelab/homelab-setup
+          path: homelab-setup-src
+          fetch-depth: 0
 
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-          cache-dependency-path: homelab-setup/go.sum
+          cache-dependency-path: homelab-setup-src/go.sum
 
       - name: Run tests
-        working-directory: homelab-setup
+        working-directory: homelab-setup-src
         run: go test ./... -v
 
       - name: Build binary
-        working-directory: homelab-setup
+        working-directory: homelab-setup-src
         run: make build
 
       - name: Copy binary to files directory
         run: |
           mkdir -p files/system/usr/bin
-          cp homelab-setup/bin/homelab-setup files/system/usr/bin/
+          cp homelab-setup-src/bin/homelab-setup files/system/usr/bin/
           chmod +x files/system/usr/bin/homelab-setup
 
       - name: Verify binary
@@ -63,7 +68,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add files/system/usr/bin/homelab-setup
-          git commit -m "chore: rebuild homelab-setup binary [skip ci]"
+          git commit -m "chore: rebuild homelab-setup binary from upstream [skip ci]"
           git push
 
       - name: Upload binary as artifact

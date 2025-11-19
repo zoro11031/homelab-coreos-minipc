@@ -6,6 +6,7 @@ Declarative image + helper tooling for the NAB9 mini PC that fronts my homelab. 
 - Single-node helper meant for my own homelab. If you grab it, expect "works on my LAN" defaults.
 - Focuses on the interactive Go helper (menu-based) with optional fallbacks to the legacy bash scripts under `files/`.
 - Inputs are trusted. The wizard validates obvious pitfalls but intentionally avoids enterprise-grade policy layers.
+- **Note:** The `homelab-setup` Go CLI source code is maintained in a separate repository at [plex-migration-homelab/homelab-setup](https://github.com/plex-migration-homelab/homelab-setup). This repo contains only the compiled binary in `files/system/usr/bin/homelab-setup`, which is automatically rebuilt by GitHub Actions when changes are pushed to the upstream repo.
 
 
 ## What's running
