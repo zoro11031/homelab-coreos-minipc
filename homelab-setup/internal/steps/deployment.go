@@ -623,7 +623,29 @@ func migrateNFSMountPointConfig(cfg *config.Config, ui *ui.UI) error {
 		// Regenerate service files if they exist
 		selectedServices := strings.Fields(cfg.GetOrDefault("SELECTED_SERVICES", ""))
 		if len(selectedServices) > 0 {
-			ui.Info("Service files will be regenerated with correct mount unit references")
+			ui.Info("Regenerating service files with correct mount unit references...")
+
+			for _, serviceName := range selectedServices {
+				serviceInfo := getServiceInfo(cfg, serviceName)
+
+				// Check if the service exists
+				exists, err := system.ServiceExists(serviceInfo.UnitName)
+				if err != nil {
+					ui.Warning(fmt.Sprintf("Failed to check service %s: %v", serviceInfo.UnitName, err))
+					continue
+				}
+
+				if exists {
+					ui.Infof("Updating service unit: %s", serviceInfo.UnitName)
+					if err := createComposeService(cfg, ui, serviceInfo); err != nil {
+						ui.Warning(fmt.Sprintf("Failed to regenerate service %s: %v", serviceInfo.UnitName, err))
+						continue
+					}
+					ui.Successf("Updated %s with correct mount dependencies", serviceInfo.UnitName)
+				}
+			}
+
+			ui.Success("Service files regenerated successfully")
 		}
 	} else {
 		ui.Success("Mount path does not require symlink resolution")
