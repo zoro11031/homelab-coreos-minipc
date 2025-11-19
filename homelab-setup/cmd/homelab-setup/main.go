@@ -10,6 +10,13 @@ import (
 )
 
 func main() {
+	// Check for version subcommand before parsing flags
+	// This allows both "homelab-setup version" and "homelab-setup -version"
+	if len(os.Args) > 1 && os.Args[1] == "version" {
+		fmt.Println(version.Info())
+		return
+	}
+
 	// Define flags
 	showVersion := flag.Bool("version", false, "Print version information")
 	flag.Parse()
