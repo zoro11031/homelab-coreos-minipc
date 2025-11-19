@@ -309,3 +309,30 @@ func CheckRootless(runtime ContainerRuntime) (bool, error) {
 		return false, fmt.Errorf("unsupported runtime: %s", runtime)
 	}
 }
+
+// CheckDockerService verifies that the Docker daemon service is running
+func CheckDockerService() error {
+	cmd := exec.Command("systemctl", "is-active", "docker.service")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker.service is not active: %w", err)
+	}
+	return nil
+}
+
+// CheckDockerComposeV2 checks for Docker Compose V2 plugin (docker compose)
+func CheckDockerComposeV2() error {
+	cmd := exec.Command("docker", "compose", "version")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker compose plugin not available: %w", err)
+	}
+	return nil
+}
+
+// CheckDockerComposeV1 checks for Docker Compose V1 standalone (docker-compose)
+func CheckDockerComposeV1() error {
+	cmd := exec.Command("docker-compose", "--version")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("docker-compose standalone not available: %w", err)
+	}
+	return nil
+}

@@ -2,6 +2,7 @@ package steps
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/config"
 	"github.com/zoro11031/homelab-coreos-minipc/homelab-setup/internal/system"
@@ -110,41 +111,59 @@ func checkRequiredPackages(ui *ui.UI) error {
 	return nil
 }
 
-// checkContainerRuntime verifies a container runtime is available
-func checkContainerRuntime(ui *ui.UI) error {
+// checkContainerRuntime verifies Docker is available and running
+func checkContainerRuntime(ui *ui.UI, cfg *config.Config) error {
 	ui.Info("Checking container runtime...")
 
-	// Check for podman first (preferred)
-	if system.CommandExists("podman") {
-		ui.Success("  ✓ Podman is available")
+	// Check if Docker service is active
+	dockerAvailable := false
+	if err := system.CheckDockerService(); err != nil {
+		ui.Error("  ✗ Docker service is not available")
+		ui.Info("To install Docker:")
+		ui.Info("  sudo rpm-ostree install docker")
+		ui.Info("  sudo systemctl reboot")
+		ui.Info("After reboot:")
+		ui.Info("  sudo systemctl enable --now docker.service")
+		return fmt.Errorf("docker service is required but not available: %w", err)
+	}
+	ui.Success("  ✓ Docker service is available")
+	dockerAvailable = true
 
-		// Check for podman-compose
-		if system.CommandExists("podman-compose") {
-			ui.Success("  ✓ podman-compose is available")
-		} else {
-			ui.Warning("  podman-compose not found (can be installed later)")
-		}
-		return nil
+	// Check for Docker Compose (prefer V2 plugin over V1 standalone)
+	composeAvailable := false
+	composeCmd := ""
+
+	if err := system.CheckDockerComposeV2(); err == nil {
+		ui.Success("  ✓ Docker Compose V2 (plugin) is available")
+		composeCmd = "docker compose"
+		composeAvailable = true
+	} else if err := system.CheckDockerComposeV1(); err == nil {
+		ui.Success("  ✓ Docker Compose V1 (standalone) is available")
+		composeCmd = "docker-compose"
+		composeAvailable = true
+	} else {
+		ui.Error("  ✗ Docker Compose is not available")
+		ui.Info("To install Docker Compose V2 (recommended):")
+		ui.Info("  See: https://docs.docker.com/compose/install/")
+		ui.Info("Or install V1 standalone:")
+		ui.Info("  sudo rpm-ostree install docker-compose")
+		ui.Info("  sudo systemctl reboot")
+		return fmt.Errorf("docker-compose is required but not available")
 	}
 
-	// Check for docker as fallback
-	if system.CommandExists("docker") {
-		ui.Success("  ✓ Docker is available")
-
-		// Check for docker-compose
-		if system.CommandExists("docker-compose") {
-			ui.Success("  ✓ docker-compose is available")
-		} else {
-			ui.Warning("  docker-compose not found (can be installed later)")
-		}
-		return nil
+	if !dockerAvailable || !composeAvailable {
+		return fmt.Errorf("docker and docker-compose are required")
 	}
 
-	ui.Error("No container runtime found (podman or docker required)")
-	ui.Info("To install podman:")
-	ui.Info("  sudo rpm-ostree install podman podman-compose")
-	ui.Info("  sudo systemctl reboot")
-	return fmt.Errorf("no container runtime available")
+	// Save runtime and compose command to config
+	if err := cfg.Set(config.KeyContainerRuntime, "docker"); err != nil {
+		ui.Warning(fmt.Sprintf("Failed to save container runtime: %v", err))
+	}
+	if err := cfg.Set(config.KeyComposeCommand, composeCmd); err != nil {
+		ui.Warning(fmt.Sprintf("Failed to save compose command: %v", err))
+	}
+
+	return nil
 }
 
 // checkSudoAccess validates sudo is available and configured
@@ -176,6 +195,75 @@ func checkSudoAccess(ui *ui.UI) error {
 		ui.Success("Sudo access validated (credentials cached)")
 	} else {
 		ui.Success("Passwordless sudo is configured")
+	}
+
+	return nil
+}
+
+// migrateFromPodmanToDocker checks for existing Podman configuration and migrates to Docker
+func migrateFromPodmanToDocker(cfg *config.Config, ui *ui.UI) error {
+	currentRuntime := cfg.GetOrDefault(config.KeyContainerRuntime, "")
+
+	if currentRuntime == "podman" {
+		ui.Warning("Detected existing Podman configuration")
+		ui.Info("Migrating to Docker (now the required runtime)...")
+
+		// Update runtime to Docker
+		if err := cfg.Set(config.KeyContainerRuntime, "docker"); err != nil {
+			return fmt.Errorf("failed to update runtime: %w", err)
+		}
+
+		// Detect and save Docker Compose command
+		if err := system.CheckDockerComposeV2(); err == nil {
+			if err := cfg.Set(config.KeyComposeCommand, "docker compose"); err != nil {
+				ui.Warning(fmt.Sprintf("Failed to save compose command: %v", err))
+			}
+			ui.Successf("Using Docker Compose V2 (plugin)")
+		} else if err := system.CheckDockerComposeV1(); err == nil {
+			if err := cfg.Set(config.KeyComposeCommand, "docker-compose"); err != nil {
+				ui.Warning(fmt.Sprintf("Failed to save compose command: %v", err))
+			}
+			ui.Successf("Using Docker Compose V1 (standalone)")
+		} else {
+			ui.Warning("Docker Compose not detected - will be checked in preflight")
+		}
+
+		// Migrate service files - remove old Podman service units
+		ui.Info("Checking for Podman service units to remove...")
+		selectedServices := strings.Fields(cfg.GetOrDefault(config.KeySelectedServices, ""))
+		removedCount := 0
+		for _, service := range selectedServices {
+			oldUnitName := fmt.Sprintf("podman-compose-%s.service", service)
+			oldUnitPath := fmt.Sprintf("/etc/systemd/system/%s", oldUnitName)
+
+			// Check if old unit exists
+			if exists, _ := system.FileExists(oldUnitPath); exists {
+				ui.Infof("Removing old Podman service unit: %s", oldUnitName)
+
+				// Stop and disable old service (best effort)
+				_ = system.StopService(oldUnitName)
+				_ = system.DisableService(oldUnitName)
+
+				// Remove unit file
+				if err := system.RemoveFile(oldUnitPath); err != nil {
+					ui.Warning(fmt.Sprintf("Failed to remove %s: %v", oldUnitPath, err))
+				} else {
+					removedCount++
+					ui.Successf("Removed: %s", oldUnitName)
+				}
+			}
+		}
+
+		if removedCount > 0 {
+			// Reload systemd daemon
+			if err := system.SystemdDaemonReload(); err != nil {
+				ui.Warning(fmt.Sprintf("Failed to reload systemd: %v", err))
+			}
+			ui.Successf("Removed %d old Podman service unit(s)", removedCount)
+		}
+
+		ui.Success("Migration from Podman to Docker completed")
+		ui.Info("Note: Docker service units will be recreated during deployment")
 	}
 
 	return nil
@@ -287,6 +375,13 @@ func RunPreflightChecks(cfg *config.Config, ui *ui.UI) error {
 	ui.Info("Verifying system requirements before setup...")
 	ui.Print("")
 
+	// CRITICAL: Migrate from Podman to Docker if needed
+	ui.Step("Checking for Configuration Migration")
+	if err := migrateFromPodmanToDocker(cfg, ui); err != nil {
+		ui.Warning(fmt.Sprintf("Migration check failed: %v", err))
+		// Non-fatal, continue with preflight checks
+	}
+
 	hasErrors := false
 	errorMessages := []string{}
 
@@ -306,7 +401,7 @@ func RunPreflightChecks(cfg *config.Config, ui *ui.UI) error {
 
 	// Run container runtime check
 	ui.Step("Checking Container Runtime")
-	if err := checkContainerRuntime(ui); err != nil {
+	if err := checkContainerRuntime(ui, cfg); err != nil {
 		hasErrors = true
 		errorMessages = append(errorMessages, err.Error())
 	}
