@@ -181,6 +181,31 @@ func checkSudoAccess(ui *ui.UI) error {
 	return nil
 }
 
+// checkSystemdUtilities verifies systemd utilities are available
+func checkSystemdUtilities(ui *ui.UI) error {
+	ui.Info("Checking systemd utilities...")
+
+	// Check for systemd-escape (critical for mount unit name generation on CoreOS)
+	if system.CommandExists("systemd-escape") {
+		ui.Success("  ✓ systemd-escape is available")
+	} else {
+		ui.Warning("  systemd-escape not found (should be available on systemd-based systems)")
+		ui.Info("  Mount unit name generation will use fallback method")
+		// Not a critical error since we have a fallback
+	}
+
+	// Check for systemctl (should always be present on systemd systems)
+	if system.CommandExists("systemctl") {
+		ui.Success("  ✓ systemctl is available")
+	} else {
+		ui.Error("  ✗ systemctl not found - this is a critical issue")
+		return fmt.Errorf("systemctl not found")
+	}
+
+	ui.Success("Systemd utilities check completed")
+	return nil
+}
+
 // checkNetworkConnectivity tests basic network connectivity
 func checkNetworkConnectivity(ui *ui.UI) error {
 	ui.Info("Checking network connectivity...")
@@ -314,6 +339,13 @@ func RunPreflightChecks(cfg *config.Config, ui *ui.UI) error {
 	// Run sudo access check
 	ui.Step("Checking Sudo Access")
 	if err := checkSudoAccess(ui); err != nil {
+		hasErrors = true
+		errorMessages = append(errorMessages, err.Error())
+	}
+
+	// Run systemd utilities check
+	ui.Step("Checking Systemd Utilities")
+	if err := checkSystemdUtilities(ui); err != nil {
 		hasErrors = true
 		errorMessages = append(errorMessages, err.Error())
 	}

@@ -640,6 +640,24 @@ func RunNFSSetup(cfg *config.Config, ui *ui.UI) error {
 		return fmt.Errorf("failed to save NFS mount point: %w", err)
 	}
 
+	// Resolve the real path (handles CoreOS symlinks like /mnt -> /var/mnt)
+	realMountPoint, err := system.ResolveRealPath(mountPoint)
+	if err != nil {
+		ui.Warning(fmt.Sprintf("Could not resolve real path: %v", err))
+		realMountPoint = mountPoint
+	}
+
+	// Save the real path for systemd mount unit generation
+	if err := cfg.Set(config.KeyNFSMountPointReal, realMountPoint); err != nil {
+		return fmt.Errorf("failed to save real NFS mount point: %w", err)
+	}
+
+	// If paths differ, inform the user about CoreOS symlinks
+	if realMountPoint != mountPoint {
+		ui.Infof("Note: On CoreOS, %s is symlinked to %s", mountPoint, realMountPoint)
+		ui.Infof("Systemd mount unit will be generated for the real path")
+	}
+
 	ui.Print("")
 	ui.Separator()
 	ui.Success("✓ NFS configuration completed")

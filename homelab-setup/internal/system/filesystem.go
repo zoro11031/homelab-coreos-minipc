@@ -471,3 +471,63 @@ func IsMount(path string) (bool, error) {
 	// If the device IDs are different, it's a mount point
 	return pathStatT.Dev != parentStatT.Dev, nil
 }
+
+// ResolveRealPath resolves symlinks to get the actual filesystem path.
+// This is critical on Fedora CoreOS where /mnt, /srv, /home, etc. are symlinks.
+// Example: /mnt/nas-media -> /var/mnt/nas-media
+func ResolveRealPath(path string) (string, error) {
+	// Clean the path first
+	cleanPath := filepath.Clean(path)
+
+	// Resolve all symlinks in the path
+	realPath, err := filepath.EvalSymlinks(cleanPath)
+	if err != nil {
+		// If we can't resolve (e.g., path doesn't exist yet), try parent
+		parent := filepath.Dir(cleanPath)
+		if parent != cleanPath && parent != "." {
+			realParent, err := filepath.EvalSymlinks(parent)
+			if err != nil {
+				// Can't resolve parent either, return original
+				return cleanPath, nil
+			}
+			// Construct path with resolved parent
+			return filepath.Join(realParent, filepath.Base(cleanPath)), nil
+		}
+		// Can't resolve, return original
+		return cleanPath, nil
+	}
+
+	return realPath, nil
+}
+
+// GetMountUnitName returns the systemd mount unit name for a given path.
+// This handles symlink resolution for Fedora CoreOS where /mnt -> /var/mnt.
+func GetMountUnitName(mountPoint string) (string, error) {
+	// Resolve symlinks to get real path
+	realPath, err := ResolveRealPath(mountPoint)
+	if err != nil {
+		return "", fmt.Errorf("failed to resolve mount point: %w", err)
+	}
+
+	// Use systemd-escape to get the correct unit name
+	cmd := exec.Command("systemd-escape", "-p", "--suffix=mount", realPath)
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to manual escaping if systemd-escape fails
+		return manualEscapeMountPath(realPath), nil
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+// manualEscapeMountPath manually escapes a path for systemd unit name
+// This is a fallback when systemd-escape is not available
+func manualEscapeMountPath(mountPoint string) string {
+	// Remove leading /
+	path := strings.TrimPrefix(mountPoint, "/")
+
+	// Replace / with -
+	path = strings.ReplaceAll(path, "/", "-")
+
+	return path + ".mount"
+}

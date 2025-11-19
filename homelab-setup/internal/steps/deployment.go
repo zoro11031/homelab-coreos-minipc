@@ -191,17 +191,24 @@ func createComposeService(cfg *config.Config, ui *ui.UI, serviceInfo *ServiceInf
 
 	// Check if NFS is configured and add mount dependency (common for both runtimes)
 	nfsMountPoint := cfg.GetOrDefault(config.KeyNFSMountPoint, "")
+	nfsMountPointReal := cfg.GetOrDefault(config.KeyNFSMountPointReal, nfsMountPoint)
+
 	if nfsMountPoint != "" {
-		// Get escaped mount unit name
-		mountUnit, err := fstabMountToSystemdUnit(nfsMountPoint)
+		// CRITICAL: Use the REAL path for mount unit name generation
+		// On Fedora CoreOS, /mnt is a symlink to /var/mnt, so we must use the real path
+		mountUnit, err := system.GetMountUnitName(nfsMountPointReal)
 		if err != nil {
-			ui.Warning(fmt.Sprintf("Failed to escape NFS mount point: %v", err))
+			ui.Warning(fmt.Sprintf("Failed to get mount unit name: %v", err))
 			ui.Info("NFS mount dependency will not be added to service unit")
 		} else {
 			unitAfter = append(unitAfter, mountUnit)
 			unitRequires = append(unitRequires, mountUnit)
-			mountDependencies = fmt.Sprintf("RequiresMountsFor=%s\n", nfsMountPoint)
-			ui.Infof("Service will depend on NFS mount: %s (%s)", nfsMountPoint, mountUnit)
+			mountDependencies = fmt.Sprintf("RequiresMountsFor=%s\n", nfsMountPointReal)
+
+			if nfsMountPointReal != nfsMountPoint {
+				ui.Infof("Resolved mount path: %s -> %s", nfsMountPoint, nfsMountPointReal)
+			}
+			ui.Infof("Service will depend on NFS mount: %s", mountUnit)
 		}
 	}
 
@@ -579,8 +586,60 @@ func deployService(cfg *config.Config, ui *ui.UI, serviceName string) error {
 	return nil
 }
 
+// migrateNFSMountPointConfig migrates existing NFS configurations to include the real path
+// This is critical for Fedora CoreOS where /mnt -> /var/mnt symlinks require proper handling
+func migrateNFSMountPointConfig(cfg *config.Config, ui *ui.UI) error {
+	nfsMountPoint := cfg.GetOrDefault(config.KeyNFSMountPoint, "")
+	if nfsMountPoint == "" {
+		// No NFS configured, nothing to migrate
+		return nil
+	}
+
+	// Check if real path is already saved
+	nfsMountPointReal := cfg.GetOrDefault(config.KeyNFSMountPointReal, "")
+	if nfsMountPointReal != "" {
+		// Already migrated
+		return nil
+	}
+
+	ui.Info("Migrating NFS mount configuration for CoreOS symlink compatibility...")
+
+	// Resolve the real path
+	realPath, err := system.ResolveRealPath(nfsMountPoint)
+	if err != nil {
+		ui.Warning(fmt.Sprintf("Could not resolve real path for %s: %v", nfsMountPoint, err))
+		realPath = nfsMountPoint
+	}
+
+	// Save the real path
+	if err := cfg.Set(config.KeyNFSMountPointReal, realPath); err != nil {
+		return fmt.Errorf("failed to save real mount point during migration: %w", err)
+	}
+
+	if realPath != nfsMountPoint {
+		ui.Infof("Detected CoreOS symlink: %s -> %s", nfsMountPoint, realPath)
+		ui.Info("Configuration updated to use real path for systemd mount units")
+
+		// Regenerate service files if they exist
+		selectedServices := strings.Fields(cfg.GetOrDefault("SELECTED_SERVICES", ""))
+		if len(selectedServices) > 0 {
+			ui.Info("Service files will be regenerated with correct mount unit references")
+		}
+	} else {
+		ui.Success("Mount path does not require symlink resolution")
+	}
+
+	return nil
+}
+
 // runDeploymentPreflight performs preflight checks before deployment
 func runDeploymentPreflight(cfg *config.Config, ui *ui.UI) error {
+	// First, migrate NFS configuration if needed
+	if err := migrateNFSMountPointConfig(cfg, ui); err != nil {
+		ui.Warning(fmt.Sprintf("NFS migration warning: %v", err))
+		// Non-critical, continue
+	}
+
 	runtime, err := getRuntimeFromConfig(cfg)
 	if err != nil {
 		return err
@@ -659,6 +718,8 @@ func runDeploymentPreflight(cfg *config.Config, ui *ui.UI) error {
 
 		// Check NFS mount if configured
 		nfsMountPoint := cfg.GetOrDefault(config.KeyNFSMountPoint, "")
+		nfsMountPointReal := cfg.GetOrDefault(config.KeyNFSMountPointReal, nfsMountPoint)
+
 		if nfsMountPoint != "" {
 			ui.Infof("Verifying NFS mount at %s...", nfsMountPoint)
 			cmd := exec.Command("findmnt", nfsMountPoint)
@@ -670,6 +731,17 @@ func runDeploymentPreflight(cfg *config.Config, ui *ui.UI) error {
 				ui.Info("  3. Verify: findmnt " + nfsMountPoint)
 				return fmt.Errorf("NFS mount not available at %s - services may fail without media storage", nfsMountPoint)
 			}
+
+			// Also verify systemd mount unit exists using the real path
+			mountUnit, err := system.GetMountUnitName(nfsMountPointReal)
+			if err == nil {
+				ui.Infof("Expected systemd mount unit: %s", mountUnit)
+				cmd := exec.Command("systemctl", "list-units", "--all", mountUnit)
+				if output, err := cmd.Output(); err == nil && len(output) > 0 {
+					ui.Successf("Systemd mount unit %s exists", mountUnit)
+				}
+			}
+
 			ui.Successf("NFS mount verified at %s", nfsMountPoint)
 		}
 	} else {
