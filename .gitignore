@@ -54,12 +54,15 @@ ignition/*.ign
 
 # Go build artifacts (local build directory only)
 # Note: files/system/usr/bin/homelab-setup is intentionally tracked
-homelab-setup/bin/
+homelab-setup/bin/*
+!homelab-setup/bin/.gitkeep
 homelab-setup/homelab-setup
 homelab-setup/*.exe
 homelab-setup/*.dll
 homelab-setup/*.so
 homelab-setup/*.dylib
+# Force track binaries in files/system/usr/bin
+!files/system/usr/bin/homelab-setup
 
 # Go test artifacts
 homelab-setup/*.test

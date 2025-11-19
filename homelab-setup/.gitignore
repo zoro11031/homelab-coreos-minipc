@@ -1,5 +1,6 @@
-# Binaries
-bin/
+# Binaries (build artifacts only)
+bin/*
+!bin/.gitkeep
 *.exe
 *.dll
 *.so

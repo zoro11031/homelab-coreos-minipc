@@ -44,23 +44,19 @@
 	"files.insertFinalNewline": true,
 	"files.exclude": {
 		"**/.git": true,
-		"**/.DS_Store": true,
-		"**/bin": true,
-		"**/*.exe": true
+		"**/.DS_Store": true
 	},
 	"files.watcherExclude": {
 		"**/.git/objects/**": true,
 		"**/.git/subtree-cache/**": true,
 		"**/node_modules/**": true,
 		"**/vendor/**": true,
-		"**/bin/**": true,
 		"**/coverage.out": true
 	},
 	// Search settings
 	"search.exclude": {
 		"**/node_modules": true,
 		"**/vendor": true,
-		"**/bin": true,
 		"**/*.code-search": true
 	},
 	// Git settings
