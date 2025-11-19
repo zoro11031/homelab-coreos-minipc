@@ -296,35 +296,42 @@ func getNFSMountOptions(cfg *config.Config) string {
 	// Base options enforce safe boot behavior and network readiness
 	baseOptions := []string{"defaults", "nfsvers=4.2", "_netdev", "nofail"}
 
-	// Track option keys so user-provided values can override defaults
-	optionPositions := make(map[string]int)
-	merged := make([]string, len(baseOptions))
-	copy(merged, baseOptions)
-
-	for i, opt := range merged {
-		optionPositions[optionKey(opt)] = i
-	}
-
+	// Parse user options into a map for easy lookup
+	userOptions := make(map[string]string)
 	rawOptions := cfg.GetOrDefault(config.KeyNFSMountOptions, "")
 	for _, raw := range strings.Split(rawOptions, ",") {
 		opt := strings.TrimSpace(raw)
 		if opt == "" {
 			continue
 		}
-
 		key := optionKey(opt)
-		if idx, exists := optionPositions[key]; exists {
-			// Override the default value while retaining ordering
-			merged[idx] = opt
-			continue
-		}
-
-		// New option not in defaults - append it
-		optionPositions[key] = len(merged)
-		merged = append(merged, opt)
+		userOptions[key] = opt
 	}
 
-	return strings.Join(merged, ",")
+	// Build final list: base options with user overrides, then append new user options
+	var result []string
+	seen := make(map[string]bool)
+
+	// First pass: add base options (or user override if present)
+	for _, baseOpt := range baseOptions {
+		key := optionKey(baseOpt)
+		if userOpt, exists := userOptions[key]; exists {
+			result = append(result, userOpt)
+			seen[key] = true
+		} else {
+			result = append(result, baseOpt)
+			seen[key] = true
+		}
+	}
+
+	// Second pass: append any new user options not in base
+	for key, userOpt := range userOptions {
+		if !seen[key] {
+			result = append(result, userOpt)
+		}
+	}
+
+	return strings.Join(result, ",")
 }
 
 // optionKey normalizes an option name for override checks (e.g., nfsvers=4.2 -> nfsvers)
