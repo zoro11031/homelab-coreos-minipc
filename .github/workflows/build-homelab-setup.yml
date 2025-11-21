@@ -22,13 +22,13 @@ jobs:
 
     steps:
       - name: Checkout this BlueBuild repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GH_PAT }}
 
       - name: Checkout homelab-setup source from forked repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: plex-migration-homelab/homelab-setup
           path: homelab-setup-src
