@@ -5,6 +5,7 @@ system:
   enabled:
     - wg-quick@wg0.service
     - home-directory-setup.service
+    - plex-codec-cleanup.timer
   # Note: The following compose services are installed but NOT auto-enabled.
   # They must be manually enabled during setup using:
   #

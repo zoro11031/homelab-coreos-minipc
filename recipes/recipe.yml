@@ -18,6 +18,11 @@ modules:
       - source: system
         destination: /
 
+  # Set executable permissions on scripts
+  - type: script
+    scripts:
+      - chmod-plex-cleanup.sh
+
   - from-file: systemd.yml
 
   - type: signing
