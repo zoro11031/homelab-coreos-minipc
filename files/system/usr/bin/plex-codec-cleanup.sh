@@ -1,38 +1,47 @@
 #!/bin/bash
-set -euo pipefail
+# /usr/bin/plex-codec-cleanup.sh
+# Optimized by SRE to prevent Thermal Runaway
 
-# Plex Codec Cleanup Script
-# Stops Plex, deletes codec directory, restarts container
-# Prevents recurring EasyAudioEncoder corruption issues
+CONTAINER_NAME="plex"
+# Path updated based on your cat output
+CODEC_DIR="/var/lib/containers/appdata/plex/config/Library/Application Support/Plex Media Server/Codecs"
+MAX_TEMP=75000  # 75°C
+LOG_TAG="plex-cleanup"
 
-echo "[$(date)] Starting Plex codec cleanup..."
+log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"; }
 
-# Stop Plex container
-echo "Stopping Plex container..."
-/usr/bin/docker stop plex || {
-    echo "ERROR: Failed to stop Plex container"
+# 1. Thermal Safety Check
+# Do not start maintenance if CPU is already cooking
+CURRENT_TEMP=$(cat /sys/class/thermal/thermal_zone*/temp | sort -nr | head -n1)
+
+if [ "$CURRENT_TEMP" -gt "$MAX_TEMP" ]; then
+    log "CRITICAL: System too hot ($((CURRENT_TEMP/1000))°C). Aborting to prevent thermal shutdown."
     exit 1
-}
+fi
 
-# Wait for graceful shutdown
-echo "Waiting 10 seconds for graceful shutdown..."
-sleep 10
+log "Starting cleanup. Temp: $((CURRENT_TEMP/1000))°C"
 
-# Delete Codecs directory (entire directory, not just contents)
-echo "Deleting Codecs directory..."
-rm -rf "/var/lib/containers/appdata/plex/config/Library/Application Support/Plex Media Server/Codecs" || {
-    echo "WARNING: Failed to delete Codecs directory (may not exist)"
-}
+# 2. Graceful Stop (Extended Timeout)
+# Give Plex 45 seconds to release the iGPU driver politely
+log "Stopping Plex (Timeout: 45s)..."
+/usr/bin/docker stop -t 45 "$CONTAINER_NAME"
 
-# Wait before restart
-echo "Waiting 5 seconds before restart..."
-sleep 5
-
-# Start Plex container
-echo "Starting Plex container..."
-/usr/bin/docker start plex || {
-    echo "ERROR: Failed to start Plex container"
+# 3. Verify Death
+# Ensure it is actually stopped before we touch files
+if [ "$(/usr/bin/docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)" == "true" ]; then
+    log "CRITICAL ERROR: Plex refused to stop. Aborting restart to prevent driver corruption."
     exit 1
-}
+fi
 
-echo "[$(date)] Plex codec cleanup completed successfully"
+# 4. Cleanup
+log "Container stopped. Cleaning codecs..."
+if [ -d "$CODEC_DIR" ]; then
+    rm -rf "$CODEC_DIR"
+else
+    log "WARNING: Codec directory not found, skipping delete."
+fi
+
+# 5. Restart
+log "Restarting Plex..."
+/usr/bin/docker start "$CONTAINER_NAME"
+log "Maintenance complete."
