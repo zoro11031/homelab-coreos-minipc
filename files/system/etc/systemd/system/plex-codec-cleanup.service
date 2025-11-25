@@ -1,0 +1,17 @@
+[Unit]
+Description=Plex Codec Cleanup Service
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/plex-codec-cleanup.sh
+StandardOutput=journal
+StandardError=journal
+User=root
+
+# Timeout after 5 minutes
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

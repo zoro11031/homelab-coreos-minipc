@@ -1,0 +1,14 @@
+[Unit]
+Description=Nightly Plex Codec Cleanup Timer
+Requires=plex-codec-cleanup.service
+
+[Timer]
+# Run daily at midnight
+OnCalendar=daily
+# Specifically at 00:00:00
+AccuracySec=1min
+# If system was off at scheduled time, run on next boot
+Persistent=true
+
+[Install]
+WantedBy=timers.target
