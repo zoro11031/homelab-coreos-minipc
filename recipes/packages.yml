@@ -37,3 +37,9 @@ modules:
       - ripgrep
       - fd-find
       - screen
+
+      # Cockpit web console
+      - cockpit-ws
+      - cockpit-ws-selinux
+      - cockpit-ostree
+      - cockpit-files

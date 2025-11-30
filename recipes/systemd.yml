@@ -5,3 +5,4 @@ system:
   enabled:
     - wg-quick@wg0.service
     - home-directory-setup.service
+    - cockpit.socket
