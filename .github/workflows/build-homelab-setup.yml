@@ -33,6 +33,8 @@ jobs:
           repository: plex-migration-homelab/homelab-setup
           path: homelab-setup-src
           fetch-depth: 0
+          # FIX: Added token here to allow access to the organization repo
+          token: ${{ secrets.GH_PAT }}
 
       - name: Set up Go
         uses: actions/setup-go@v5
