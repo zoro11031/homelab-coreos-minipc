@@ -97,9 +97,11 @@ For virtualization platforms (libvirt, QEMU, etc.), provide the Ignition file as
 
 If you have physical access to the machine, you can use a USB drive to provide the Ignition config during installation. This is particularly useful for bare-metal installations where you can't easily embed the config in the ISO.
 
-##### Step 1: Identify Your Drives
+**Prerequisites**: You should have already copied `config.ign` to a USB drive on your workstation before starting this process.
 
-First, boot from the Fedora CoreOS live ISO and identify your drives:
+##### Step 1: Boot Target Machine and Identify Drives
+
+Boot from the Fedora CoreOS live ISO and identify your drives:
 
 ```bash
 # List all block devices
@@ -113,93 +115,34 @@ Example output from `lsblk`:
 ```
 NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
 sda      8:0    0 238.5G  0 disk          # Your SSD (install target)
-sdb      8:16   1  14.9G  0 disk          # Your USB drive
+sdb      8:16   1  14.9G  0 disk          # Your USB drive with Ignition file
 ├─sdb1   8:17   1  14.9G  0 part
-```
-
-Example output from `blkid`:
-```
-/dev/sda: TYPE="disk"
-/dev/sdb1: UUID="ABCD-1234" LABEL="IGNITION" TYPE="vfat"
 ```
 
 **Important**:
 - `/dev/sda` (or similar) is typically your SSD where you'll install CoreOS
-- `/dev/sdb` (or similar) is typically your USB drive
+- `/dev/sdb` (or similar) is typically your USB drive with the Ignition file
 - **Double-check** before proceeding - installing to the wrong drive will erase it!
 
-##### Step 2: Prepare Your USB Drive
-
-If your USB drive doesn't already have a filesystem, format it:
-
-```bash
-# WARNING: This will erase all data on the USB drive!
-# Replace /dev/sdb with your actual USB device
-
-# Create a new partition table
-sudo parted /dev/sdb mklabel gpt
-
-# Create a single partition
-sudo parted /dev/sdb mkpart primary fat32 1MiB 100%
-
-# Format as FAT32 (widely compatible)
-sudo mkfs.vfat -n IGNITION /dev/sdb1
-
-# Verify
-sudo blkid /dev/sdb1
-```
-
-##### Step 3: Mount the USB Drive
+##### Step 2: Mount the USB Drive and Install CoreOS
 
 ```bash
 # Create a mount point
 sudo mkdir -p /mnt/usb
 
-# Mount the USB drive
+# Mount the USB drive (should have your config.ign file on it)
 sudo mount /dev/sdb1 /mnt/usb
 
-# Verify it's mounted
-mount | grep /mnt/usb
-df -h /mnt/usb
-```
-
-##### Step 4: Copy Ignition Config to USB
-
-```bash
-# Copy your Ignition config to the USB drive
-sudo cp config.ign /mnt/usb/
-
-# Verify the copy
+# Verify the Ignition file is there
 ls -lh /mnt/usb/config.ign
-
-# Optional: Set permissions to be readable
-sudo chmod 644 /mnt/usb/config.ign
-
-# Sync to ensure data is written
-sudo sync
-
-# Unmount the USB drive
-sudo umount /mnt/usb
-```
-
-##### Step 5: Install CoreOS with USB-Provided Config
-
-Now you can install CoreOS to your SSD, using the Ignition config from the USB drive:
-
-```bash
-# Remount the USB drive (if you unplugged it)
-sudo mount /dev/sdb1 /mnt/usb
 
 # Install CoreOS to the SSD with Ignition config from USB
 # Replace /dev/sda with your actual SSD device
 sudo coreos-installer install /dev/sda \
   --ignition-file /mnt/usb/config.ign
-
-# Alternative: If the USB is still mounted at /mnt/usb
-sudo coreos-installer install /dev/sda -i /mnt/usb/config.ign
 ```
 
-##### Step 6: Post-Installation
+##### Step 3: Post-Installation
 
 ```bash
 # Unmount the USB drive
