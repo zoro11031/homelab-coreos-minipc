@@ -40,20 +40,20 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.23'
-          cache-dependency-path: homelab-setup-src/go.sum
+          cache-dependency-path: homelab-setup-src/homelab-setup/go.sum
 
       - name: Run tests
-        working-directory: homelab-setup-src
+        working-directory: homelab-setup-src/homelab-setup
         run: go test ./... -v
 
       - name: Build binary
-        working-directory: homelab-setup-src
+        working-directory: homelab-setup-src/homelab-setup
         run: make build
 
       - name: Copy binary to files directory
         run: |
           mkdir -p files/system/usr/bin
-          cp homelab-setup-src/bin/homelab-setup files/system/usr/bin/
+          cp homelab-setup-src/homelab-setup/bin/homelab-setup files/system/usr/bin/
           chmod +x files/system/usr/bin/homelab-setup
 
       - name: Verify binary
